@@ -437,7 +437,7 @@ variables and no others:
 | `{cwd}` | The working directory, `--cwd`, as an absolute path |
 | `{git_enabled}` | `true` if it is inside a git repository, else `false` |
 | `{system_platform}` | Python's `sys.platform`: `darwin`, `linux`, `win32` |
-| `{shell}` | The shell commands run in: `/bin/sh`, or `%COMSPEC%` on Windows. Not `$SHELL` — a command written for zsh can fail in the shell that actually runs it |
+| `{shell}` | The shell commands run in: `bash` where it is installed, else `/bin/sh`; `%COMSPEC%` on Windows. Not `$SHELL` — a command written for zsh can fail in the shell that actually runs it |
 | `{os_version}` | The OS and its release, e.g. `Darwin 23.4.0` |
 | `{agent_model}` | The id of the model the run uses |
 | `{date}` | Today's date, ISO: `2026-10-21` |

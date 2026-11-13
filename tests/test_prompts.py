@@ -9,7 +9,6 @@ startup rather than in the one directory where it is first filled.
 
 import datetime
 import re
-import subprocess
 import sys
 from dataclasses import fields, replace
 from pathlib import Path
@@ -27,6 +26,7 @@ from lab_harness.config import (
     _shipped_prompts,
     load_config,
 )
+from lab_harness.llm.types import TextBlock
 from lab_harness.prompts import (
     Environment,
     ProjectContext,
@@ -34,6 +34,8 @@ from lab_harness.prompts import (
     detect_environment,
 )
 from lab_harness.tools import BUILTIN_TOOLS
+from lab_harness.tools.base import ToolContext
+from lab_harness.tools.shell import bash
 
 INSTRUCTIONS = ProjectContext(path=Path("/repo/AGENTS.md"), text="Use tabs.")
 ENVIRONMENT = Environment(
@@ -335,11 +337,20 @@ def test_a_directory_outside_any_repository(tmp_path: Path) -> None:
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="POSIX shells name themselves in $0")
-def test_the_shell_is_the_one_commands_run_in(tmp_path: Path) -> None:
-    """`shell=True` is what `create_subprocess_shell` uses, and $0 names the shell."""
-    ran = subprocess.run("echo $0", shell=True, capture_output=True, text=True, check=True)
+@pytest.mark.parametrize("bash_on_path", [True, False])
+async def test_the_shell_is_the_one_commands_run_in(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, bash_on_path: bool
+) -> None:
+    """The prompt names the shell the bash tool runs, as that shell names itself."""
+    if not bash_on_path:
+        monkeypatch.setenv("PATH", str(tmp_path))
+    ran = await bash.execute(
+        {"command": "echo $0"}, ToolContext(cwd=str(tmp_path), call_id="c1", config=Config())
+    )
 
-    assert detect_environment(tmp_path, "m").shell == ran.stdout.strip()
+    assert detect_environment(tmp_path, "m").shell == "".join(
+        b.text for b in ran.content if isinstance(b, TextBlock)
+    )
 
 
 def test_the_date_is_the_day_the_prompt_is_built(tmp_path: Path) -> None:

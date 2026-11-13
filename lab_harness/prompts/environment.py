@@ -8,6 +8,7 @@ same prompt on any machine.
 import datetime
 import os
 import platform
+import shutil
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -55,12 +56,13 @@ def detect_environment(cwd: str | Path, model: str) -> Environment:
 
 
 def _shell() -> str:
-    """The shell `asyncio.create_subprocess_shell` starts, which runs commands.
+    """The shell the bash tool runs commands in, as `tools/shell.py` picks it.
 
     Not `$SHELL`: that is the user's login shell, and a command written for zsh
-    can fail in the /bin/sh that actually runs it. These are the subprocess
-    module's own choices, so they are constants here rather than config.
+    can fail in the shell that actually runs it. Bash where it is installed,
+    else /bin/sh, and on Windows the subprocess module's own %COMSPEC% — the
+    tool's choices, so they are constants here rather than config.
     """
     if sys.platform == "win32":
         return os.environ.get("COMSPEC", "cmd.exe")
-    return "/bin/sh"
+    return "/bin/sh" if shutil.which("bash") is None else "bash"

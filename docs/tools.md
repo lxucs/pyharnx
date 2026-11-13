@@ -109,7 +109,15 @@ mid-session is reported without changing anything.
 
 ## bash
 
-Three things make it more than "run a subprocess":
+A few things make it more than "run a subprocess":
+
+**Bash, not sh.** Commands run in `bash -c` wherever bash is installed,
+falling back to `/bin/sh` only where it is not. The tool is named for bash and
+the model writes bash — `[[ ]]`, arrays, `<(...)` — which `/bin/sh` rejects:
+on Debian and Ubuntu it is dash, which has none of it, and macOS's bash 3.2
+turns some of it off when run as sh. On Windows commands run in `%COMSPEC%`,
+since the `bash` on PATH there may be WSL's. The system prompt's `{shell}`
+names whichever it is.
 
 **No stdin.** The command gets `/dev/null`, never the terminal's — a command
 that reads (`read`, `cat`, an editor, `ssh` asking for a passphrase) would
@@ -120,7 +128,7 @@ is watching. Piping *within* the command is unaffected.
 long build is visible while it runs.
 
 **Cancellation.** `ctx.signal` stops the process *group*, not just the shell.
-Killing only the shell orphans whatever it started — `sh -c "sleep 100"` would
+Killing only the shell orphans whatever it started — `bash -c "sleep 100"` would
 leave the sleep running. On cancellation the group gets SIGTERM, then SIGKILL
 after a grace period.
 

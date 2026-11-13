@@ -1,6 +1,8 @@
 """The bash tool.
 
-Four things make this harder than "run a subprocess":
+It runs bash where bash is installed, not the /bin/sh a subprocess shell
+defaults to — see `_executable`. Four more things make this harder than "run
+a subprocess":
 
 **No stdin.** The command gets `/dev/null`, never the terminal's. A command that
 reads — `read`, `cat`, an editor, `git commit` opening one, `ssh` asking for a
@@ -12,8 +14,8 @@ only the harness's own input is withheld.
 long build is visible while it runs rather than after.
 
 **Cancellation.** `ctx.signal` must actually stop the process. We terminate the
-whole process *group*, not just the shell — otherwise `sh -c "sleep 100"` leaves
-the sleep running after the shell dies.
+whole process *group*, not just the shell — otherwise `bash -c "sleep 100"`
+leaves the sleep running after the shell dies.
 
 **Bounded output.** A command that prints a gigabyte must not end up in the
 context window. Output is capped with the head and tail kept and the middle
@@ -23,7 +25,9 @@ elided, because both ends usually matter and the middle rarely does.
 import asyncio
 import contextlib
 import os
+import shutil
 import signal as signal_module
+import sys
 
 from pydantic import BaseModel, Field
 
@@ -69,6 +73,7 @@ async def bash(p: BashParams, ctx: ToolContext) -> ToolResult:
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT,
             cwd=ctx.cwd,
+            executable=_executable(),
             # Own process group, so cancellation reaches children too.
             start_new_session=True,
         )
@@ -105,6 +110,23 @@ async def bash(p: BashParams, ctx: ToolContext) -> ToolResult:
         is_error=code != 0,
         details={"exit_code": code, "command": p.command, "truncated": collector.truncated},
     )
+
+
+def _executable() -> str | None:
+    """The shell that runs the command: bash, where it is installed.
+
+    The tool is named for bash, and the model writes bash — `[[ ]]`, arrays,
+    `<(...)` — which the default /bin/sh rejects: dash, Debian's and Ubuntu's,
+    has none of it, and macOS's bash 3.2 turns some of it off as sh. By name,
+    not path, so `$0` and the prompt say `bash` and not where it is installed.
+
+    None keeps the default: /bin/sh without bash, and on Windows %COMSPEC%,
+    because the `bash` there may be WSL's, which runs in another filesystem.
+    `prompts/environment.py` reports the same choice to the model.
+    """
+    if sys.platform == "win32" or shutil.which("bash") is None:
+        return None
+    return "bash"
 
 
 async def _pump(

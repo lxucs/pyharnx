@@ -7,9 +7,13 @@ streaming) cannot be exercised against a mock. No network is involved.
 
 import asyncio
 import os
+import shutil
 import time
 from pathlib import Path
 
+import pytest
+
+import lab_harness.tools.shell as shell_module
 from lab_harness.config import BashConfig, Config, ToolsConfig
 from lab_harness.llm.types import TextBlock
 from lab_harness.tools.base import ToolContext, ToolResult
@@ -88,6 +92,40 @@ async def test_reports_no_output_rather_than_an_empty_result(tmp_path: Path) -> 
 
     assert _text(result) == "[no output]"
     assert not result.is_error
+
+
+# --- the shell ------------------------------------------------------------
+
+
+@pytest.mark.skipif(shutil.which("bash") is None, reason="bash is not installed")
+async def test_commands_run_in_bash_where_it_is_installed(tmp_path: Path) -> None:
+    """The tool is named for bash, and the model writes bash.
+
+    Process substitution fails in every /bin/sh: dash, Debian's and Ubuntu's,
+    has none of bash's syntax, and macOS's bash 3.2 turns it off as sh.
+    """
+    result = await bash.execute({"command": "cat <(echo hi)"}, _ctx(tmp_path))
+
+    assert not result.is_error, _text(result)
+    assert _text(result) == "hi"
+
+
+async def test_without_bash_commands_run_in_sh(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A machine with no bash still runs commands, in the shell it does have."""
+    monkeypatch.setenv("PATH", str(tmp_path))
+
+    result = await bash.execute({"command": "echo $0"}, _ctx(tmp_path))
+
+    assert _text(result) == "/bin/sh"
+
+
+def test_on_windows_commands_run_in_comspec(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Not a `bash` found on PATH: on Windows that may be WSL's, in another filesystem."""
+    monkeypatch.setattr(shell_module.sys, "platform", "win32")
+
+    assert shell_module._executable() is None
 
 
 # --- limits ---------------------------------------------------------------

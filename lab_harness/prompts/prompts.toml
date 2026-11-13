@@ -15,7 +15,7 @@
 #   {cwd}              the working directory, as an absolute path
 #   {git_enabled}      "true" if it is inside a git repository, else "false"
 #   {system_platform}  Python's sys.platform: "darwin", "linux", "win32"
-#   {shell}            the shell commands run in: /bin/sh, or %COMSPEC% on Windows
+#   {shell}            the shell commands run in: bash, else /bin/sh; %COMSPEC% on Windows
 #   {os_version}       the OS and its release, e.g. "Darwin 23.4.0"
 #   {agent_model}      the id of the model the agent runs
 #   {date}             today's date, ISO: 2026-10-21
