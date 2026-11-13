@@ -144,6 +144,12 @@ than filtered after, so a large `node_modules` is never descended into.
 `glob` sorts **newest first**: in a repo someone is actively working in, recency
 is a better relevance signal than alphabetical order.
 
+Both **page**. A capped result ends with a note naming the `offset` to re-run
+with, and says so only when more remain — `grep` looks for one match past the
+page rather than claiming a full page is a truncated one. Paging is only
+meaningful if every call sees the same order, so `grep` walks directories
+sorted, and `glob` breaks mtime ties by path.
+
 ## Approval
 
 Mutating tools are gated by a `before_tool_call` hook, not by loop logic — which
@@ -167,13 +173,13 @@ one run must not silently authorize the next.
 
 | Tool | Mode | Notes |
 |---|---|---|
-| `read` | parallel | 1-indexed numbered lines; offset/limit; clips long lines; refuses oversized and binary files |
+| `read` | parallel | 1-indexed numbered lines; offset/limit; clips long lines; stops at a byte budget; refuses binary files |
 | `write` | **sequential** | Creates parent directories; overwrites; reports a diff against what was there. **Approval-gated.** |
 | `edit` | **sequential** | Exact string replacement; refuses ambiguous matches unless `replace_all`; reports a diff. **Approval-gated.** |
-| `ls` | parallel | Directories first, marked with `/`; hides dotfiles unless `all` |
+| `ls` | parallel | Directories first, marked with `/`; hides dotfiles unless `all`; offset |
 | `bash` | **sequential** | Combined stdout+stderr, streamed; timeout; output capped. **Approval-gated.** |
-| `grep` | parallel | Regex over file contents; skips binary files and ignored directories |
-| `glob` | parallel | Files by path pattern, newest first |
+| `grep` | parallel | Regex over file contents; skips binary files and ignored directories; offset/limit |
+| `glob` | parallel | Files by path pattern, newest first; offset |
 | `web_search` | parallel | Titles, URLs and snippets via a pluggable backend |
 | `web_fetch` | parallel | One page as markdown-ish text; follows redirects |
 | `skill` | parallel | Loads a skill's instructions by name; see [Skills](#skills) |
@@ -186,14 +192,14 @@ Every threshold is a config key, never a literal:
 |---|---|---|
 | `tools.read.default_limit` | 2000 | Lines returned when none requested |
 | `tools.read.max_line_length` | 2000 | Where a long line is clipped |
-| `tools.read.max_bytes` | 256000 | Largest file `read` will open |
-| `tools.list.max_entries` | 1000 | Entries per `ls` |
+| `tools.read.max_bytes` | 256000 | Output one `read` returns, at most |
+| `tools.list.max_entries` | 1000 | Entries per `ls` page |
 | `tools.diff.context_lines` | 3 | Unchanged lines around each change in an edit's or write's diff |
 | `tools.bash.timeout_seconds` | 120 | Default command timeout |
 | `tools.bash.max_timeout_seconds` | 600 | Ceiling on a requested timeout |
 | `tools.bash.max_output_bytes` | 30000 | Output kept before eliding the middle |
-| `tools.search.max_results` | 200 | Matches per `grep` |
-| `tools.search.max_files` | 500 | Paths per `glob` |
+| `tools.search.max_results` | 200 | Matches per `grep` page |
+| `tools.search.max_files` | 500 | Paths per `glob` page |
 | `tools.search.ignored_directories` | `.git`, `node_modules`, … | Never descended into |
 | `tools.web.backend` | `tavily` | Which search backend runs |
 | `tools.web.max_results` | 5 | Results per search |
@@ -206,8 +212,10 @@ Every threshold is a config key, never a literal:
 | `skills.directory_name` | `skills` | Subdirectory holding them, in `.lab-harness` and in home |
 | `skills.max_bytes` | 32000 | Where a long `SKILL.md` is cut |
 
-`read`'s truncation note names the offset to resume from, so a follow-up call is
-mechanical rather than guesswork.
+`read`'s truncation note names the offset to resume from, as `ls`'s, `grep`'s
+and `glob`'s do, so a follow-up call is mechanical rather than guesswork. `max_bytes` bounds what one `read`
+returns, not which files it opens: the file is streamed, so a range of a large
+one costs only the range.
 
 ### Paths in output
 

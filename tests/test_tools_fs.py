@@ -58,14 +58,46 @@ async def test_read_clips_very_long_lines(tmp_path: Path) -> None:
     assert "x" * 11 not in _text(result)
 
 
-async def test_read_refuses_files_over_the_byte_limit(tmp_path: Path) -> None:
-    (tmp_path / "big.txt").write_text("x" * 100)
+async def test_read_stops_at_the_byte_limit_and_names_the_offset_to_resume(
+    tmp_path: Path,
+) -> None:
+    # Each rendered line is "N\txxxxxxxxxx" plus its newline: 13 bytes, so three fit in 50.
+    (tmp_path / "big.txt").write_text("xxxxxxxxxx\n" * 10)
     config = Config(tools=ToolsConfig(read=ReadConfig(max_bytes=50)))
 
     result = await read.execute({"path": "big.txt"}, _ctx(tmp_path, config))
 
-    assert result.is_error
-    assert "over the 50-byte limit" in _text(result)
+    assert not result.is_error
+    assert _text(result).splitlines()[:3] == [f"{n}\txxxxxxxxxx" for n in (1, 2, 3)]
+    assert _text(result).endswith("[truncated at 3 of 10 lines; re-read with offset=4]")
+
+
+async def test_read_serves_a_range_of_a_file_over_the_byte_limit(tmp_path: Path) -> None:
+    """The byte limit bounds what one read returns, not which files can be read."""
+    (tmp_path / "big.txt").write_text("\n".join(str(i) for i in range(1, 1001)))
+    config = Config(tools=ToolsConfig(read=ReadConfig(max_bytes=50)))
+
+    result = await read.execute(
+        {"path": "big.txt", "offset": 500, "limit": 2}, _ctx(tmp_path, config)
+    )
+
+    assert not result.is_error
+    assert _text(result) == (
+        "500\t500\n501\t501\n\n[truncated at 501 of 1000 lines; re-read with offset=502]"
+    )
+
+
+async def test_read_returns_one_line_even_when_it_alone_exceeds_the_byte_limit(
+    tmp_path: Path,
+) -> None:
+    """Otherwise the offset to resume from would be the one just tried, forever."""
+    (tmp_path / "wide.txt").write_text("x" * 40 + "\n" + "y\n")
+    config = Config(tools=ToolsConfig(read=ReadConfig(max_bytes=5)))
+
+    result = await read.execute({"path": "wide.txt"}, _ctx(tmp_path, config))
+
+    note = "[truncated at 1 of 2 lines; re-read with offset=2]"
+    assert _text(result) == f"1\t{'x' * 40}\n\n{note}"
 
 
 async def test_read_reports_a_missing_file(tmp_path: Path) -> None:
@@ -340,14 +372,41 @@ async def test_ls_hides_dotfiles_unless_asked(tmp_path: Path) -> None:
     assert ".hidden" in _text(with_all)
 
 
-async def test_ls_truncates_at_the_configured_limit(tmp_path: Path) -> None:
+async def test_ls_caps_entries_and_says_how_to_page(tmp_path: Path) -> None:
     for i in range(5):
         (tmp_path / f"f{i}.txt").write_text("")
     config = Config(tools=ToolsConfig(list=ListConfig(max_entries=2)))
 
     result = await ls.execute({}, _ctx(tmp_path, config))
 
-    assert "[truncated at 2 of 5 entries]" in _text(result)
+    assert _text(result).splitlines()[-1] == (
+        "[showing 1-2 of 5 entries; more remain, re-run with offset=2]"
+    )
+
+
+async def test_ls_pages_with_offset(tmp_path: Path) -> None:
+    for name in "abcde":
+        (tmp_path / name).write_text("")
+    config = Config(tools=ToolsConfig(list=ListConfig(max_entries=2)))
+
+    middle = await ls.execute({"offset": 2}, _ctx(tmp_path, config))
+    last = await ls.execute({"offset": 4}, _ctx(tmp_path, config))
+
+    assert _text(middle).splitlines() == [
+        "c",
+        "d",
+        "[showing 3-4 of 5 entries; more remain, re-run with offset=4]",
+    ]
+    assert _text(last) == "e"
+
+
+async def test_ls_rejects_an_offset_past_the_last_entry(tmp_path: Path) -> None:
+    (tmp_path / "a").write_text("")
+
+    result = await ls.execute({"offset": 1}, _ctx(tmp_path))
+
+    assert result.is_error
+    assert "past the last entry (1 in all)" in _text(result)
 
 
 async def test_ls_reports_an_empty_directory(tmp_path: Path) -> None:

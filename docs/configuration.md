@@ -103,10 +103,10 @@ enabled = [             # what the model may call, in both modes; --tools overri
 [tools.read]
 default_limit = 2000    # lines returned when the model requests no limit
 max_line_length = 2000  # where a long line is clipped
-max_bytes = 256000      # largest file `read` will open
+max_bytes = 256000      # output one `read` returns, at most
 
 [tools.list]
-max_entries = 1000      # entries per `ls`
+max_entries = 1000      # entries per `ls` page
 
 [tools.diff]
 context_lines = 3       # unchanged lines around each change in an edit's diff
@@ -117,8 +117,8 @@ max_timeout_seconds = 600   # ceiling on a requested timeout
 max_output_bytes = 30000    # output kept before eliding the middle
 
 [tools.search]
-max_results = 200       # matches per grep
-max_files = 500         # paths per glob
+max_results = 200       # matches per grep page
+max_files = 500         # paths per glob page
 ignored_directories = [".git", "node_modules", "__pycache__"]  # …and more
 
 [tools.web]

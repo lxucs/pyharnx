@@ -110,11 +110,11 @@ enabled = [
 default_limit = 2000
 # Longer lines are clipped, so one minified file cannot flood the context.
 max_line_length = 2000
-# Files above this are refused rather than read.
+# Output one read returns, at most; a larger file is read in ranges.
 max_bytes = 256000
 
 [tools.list]
-# Entries returned per `ls`.
+# Entries returned per `ls`; offset pages past them.
 max_entries = 1000
 
 [tools.diff]
@@ -133,9 +133,9 @@ max_output_bytes = 30000
 update_interval_seconds = 0.5
 
 [tools.search]
-# Matches returned by one grep.
+# Matches returned by one grep; offset pages past them.
 max_results = 200
-# Paths returned by one glob.
+# Paths returned by one glob; offset pages past them.
 max_files = 500
 # Longer matching lines are clipped in grep output.
 max_line_length = 400

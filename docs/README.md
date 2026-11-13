@@ -34,7 +34,8 @@ Every numbered build step is complete, so these pages describe what the code
 does rather than what it will do. At a glance:
 
 - **Runtime** — a tested agent loop; the local tool set
-  (`read`/`write`/`edit`/`ls`/`bash`/`grep`/`glob`/`skill`); `web_search` and
+  (`read`/`write`/`edit`/`ls`/`bash`/`grep`/`glob`/`skill`), whose output is
+  bounded and, for reading and searching, paged by offset; `web_search` and
   `web_fetch` behind pluggable backends; three provider adapters — Messages,
   Responses, Chat Completions. Reasoning is carried across tool calls the way
   each vendor requires, a retryable failure is sent again with a doubling

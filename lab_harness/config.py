@@ -114,14 +114,14 @@ class ReadConfig:
     default_limit: int = 2_000
     #: Longer lines are cut, so one minified file cannot flood the context.
     max_line_length: int = 2_000
-    #: Files above this are refused rather than read — the model cannot use a
-    #: megabyte of text, and sending it is expensive.
+    #: Output one read returns, at most. A larger file is read in ranges: the
+    #: model cannot use a megabyte of text, and sending it is expensive.
     max_bytes: int = 256_000
 
 
 @dataclass(frozen=True, slots=True)
 class ListConfig:
-    #: Entries returned per directory listing.
+    #: Entries returned per directory listing; offset pages past them.
     max_entries: int = 1_000
 
 
@@ -140,9 +140,9 @@ class BashConfig:
 
 @dataclass(frozen=True, slots=True)
 class SearchConfig:
-    #: Matches returned by one grep.
+    #: Matches returned by one grep; offset pages past them.
     max_results: int = 200
-    #: Paths returned by one glob.
+    #: Paths returned by one glob; offset pages past them.
     max_files: int = 500
     #: Longer matching lines are clipped in grep output.
     max_line_length: int = 400

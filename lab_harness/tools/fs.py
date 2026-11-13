@@ -14,6 +14,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
+from lab_harness.config import ReadConfig
 from lab_harness.tools.base import ToolContext, ToolResult, fail, ok, tool
 
 _TRUNCATION_NOTE = "\n\n[truncated at {shown} of {total} lines; re-read with offset={next_offset}]"
@@ -66,41 +67,54 @@ async def read(p: ReadParams, ctx: ToolContext) -> ToolResult:
     if path.is_dir():
         return fail(f"{display(path, ctx)} is a directory. Use `ls` to list it.")
 
-    size = path.stat().st_size
-    if size > limits.max_bytes:
-        return fail(
-            f"{display(path, ctx)} is {size} bytes, over the {limits.max_bytes}-byte "
-            f"limit. Read a range with offset and limit, or use grep to find what you need."
-        )
-
+    start = (p.offset or 1) - 1
     try:
-        content = path.read_text(encoding="utf-8")
+        window, total = _window(path, start, p.limit or limits.default_limit, limits)
     except UnicodeDecodeError:
         return fail(f"{display(path, ctx)} is not UTF-8 text. It may be a binary file.")
     except OSError as exc:
         return fail(f"Could not read {display(path, ctx)}: {exc}")
 
-    lines = content.splitlines()
-    start = (p.offset or 1) - 1
-    if start >= len(lines) and lines:
-        return fail(f"offset {p.offset} is past the end of the file ({len(lines)} lines).")
+    if not total:
+        return ok("[file is empty]", path=display(path, ctx), lines=0, total_lines=0)
+    if start >= total:
+        return fail(f"offset {p.offset} is past the end of the file ({total} lines).")
 
-    count = p.limit or limits.default_limit
-    window = lines[start : start + count]
-
-    rendered = "\n".join(
-        f"{start + i + 1}\t{_clip(line, limits.max_line_length)}" for i, line in enumerate(window)
-    )
+    rendered = "\n".join(window)
     shown = start + len(window)
-    if shown < len(lines):
-        rendered += _TRUNCATION_NOTE.format(shown=shown, total=len(lines), next_offset=shown + 1)
-    if not lines:
-        rendered = "[file is empty]"
-
-    return ok(rendered, path=display(path, ctx), lines=len(window), total_lines=len(lines))
+    if shown < total:
+        rendered += _TRUNCATION_NOTE.format(shown=shown, total=total, next_offset=shown + 1)
+    return ok(rendered, path=display(path, ctx), lines=len(window), total_lines=total)
 
 
-def _clip(line: str, limit: int) -> str:
+def _window(path: Path, start: int, count: int, limits: ReadConfig) -> tuple[list[str], int]:
+    """The numbered lines from `start` that fit both limits, and the file's line count.
+
+    Streamed: only the window is held, so a range of a file far larger than
+    `max_bytes` costs no more than the range. The first line is always taken,
+    however wide, or the offset to resume from would be the one just tried.
+    """
+    window: list[str] = []
+    budget = limits.max_bytes
+    full = False
+    total = 0
+    with path.open("r", encoding="utf-8") as handle:
+        for total, line in enumerate(handle, start=1):
+            if full or total <= start:
+                continue
+            numbered = f"{total}\t{clip(line.rstrip('\n'), limits.max_line_length)}"
+            cost = len(numbered.encode()) + 1
+            if window and cost > budget:
+                full = True
+                continue
+            window.append(numbered)
+            budget -= cost
+            full = len(window) == count
+    return window, total
+
+
+def clip(line: str, limit: int) -> str:
+    """Cut `line` at `limit` characters, saying so. Shared with grep."""
     return line if len(line) <= limit else line[:limit] + _LINE_CUT.format(limit=limit)
 
 
@@ -243,9 +257,18 @@ def _diff(before: str, after: str, shown: str, ctx: ToolContext, *, new: bool = 
 class ListParams(BaseModel):
     path: str = Field(default=".", description="Directory to list. Defaults to the working dir.")
     all: bool = Field(default=False, description="Include entries beginning with a dot.")
+    offset: int = Field(
+        default=0, ge=0, description="Entries to skip, to page past an earlier result."
+    )
 
 
-@tool(name="ls", description="List the entries of a directory. Directories are marked with /.")
+@tool(
+    name="ls",
+    description=(
+        "List the entries of a directory, directories first. Directories are "
+        "marked with /; offset pages through a long listing."
+    ),
+)
 async def ls(p: ListParams, ctx: ToolContext) -> ToolResult:
     path = resolve(p.path, ctx)
     if not path.exists():
@@ -261,14 +284,26 @@ async def ls(p: ListParams, ctx: ToolContext) -> ToolResult:
     if not p.all:
         entries = [e for e in entries if not e.name.startswith(".")]
 
-    limit = ctx.config.tools.list.max_entries
-    shown = entries[:limit]
+    if p.offset and p.offset >= len(entries):
+        return fail(f"offset {p.offset} is past the last entry ({len(entries)} in all).")
+
+    shown = entries[p.offset : p.offset + ctx.config.tools.list.max_entries]
     names = [f"{e.name}/" if e.is_dir() else e.name for e in shown]
     rendered = "\n".join(names) if names else "[empty]"
-    if len(entries) > limit:
-        rendered += f"\n[truncated at {limit} of {len(entries)} entries]"
+    last = p.offset + len(shown)
+    if last < len(entries):
+        rendered += (
+            f"\n[showing {p.offset + 1}-{last} of {len(entries)} entries; "
+            f"more remain, re-run with offset={last}]"
+        )
 
-    return ok(rendered, path=display(path, ctx), entries=len(shown), total_entries=len(entries))
+    return ok(
+        rendered,
+        path=display(path, ctx),
+        entries=len(shown),
+        offset=p.offset,
+        total_entries=len(entries),
+    )
 
 
 FILESYSTEM_TOOLS = (read, write, edit, ls)
