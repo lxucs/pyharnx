@@ -6,12 +6,14 @@
 [![PyPI](https://img.shields.io/pypi/v/pyharnx)](https://pypi.org/project/pyharnx/)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.24283575.svg)](https://doi.org/10.5281/zenodo.24283575)
 
-pyharnx is **a minimal agent harness built for experiments, and a lightweight 
+pyharnx is **a minimal agent harness built for experiments, a lightweight 
 Python alternative to [pi](https://github.com/earendil-works/pi)**, short for
-**Py**thon **harn**ess for e**x**periments. Small enough to read in an 
-afternoon, complete enough to run them end to end.
+**Py**thon **harn**ess for e**x**periments. 
 
-It keeps pi's layering — `llm/` for pi-ai, `agent/` for pi-agent-core, a pure
+It has a clean agentic loop, friendly for research experiments in python.
+The code is small enough to read in an afternoon, and complete enough to run end to end.
+
+pyharnx keeps pi's layering — `llm/` for pi-ai, `agent/` for pi-agent-core, a pure
 loop wrapped by a stateful `Agent` — in Python, so the harness runs locally in
 the same process as the rest of an experiment: the data, the evaluation, the
 analysis. Where it departs from pi, and why:
