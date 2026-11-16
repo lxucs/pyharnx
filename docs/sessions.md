@@ -119,14 +119,95 @@ always include the reasoning, even under a profile that sends none back.
 [trajectories.py](../examples/trajectories.py) `--wire` writes both, one line
 per request. Tests check the rebuilt body against what each adapter posted.
 
-Whether the model was then shown the reasoning a request carried is up to its
-chat template, which differs by model;
-[providers.md](providers.md#on-open-weights-the-chat-template-decides) has the
-rules for Qwen3, GLM and DeepSeek.
+### As the model read it
 
-The token sequence itself — after the chat template, with the model's special
-tokens — is not recoverable from a session. Only the inference server has it,
-and only one serving open weights can return it.
+The token sequence — the messages after the model's chat template, special
+tokens and all — is not in a session. Where it comes from depends on which one
+you want.
+
+**The ids a server used**, for RL or anything else on-policy, only that server
+has. Rendering the text again need not reproduce them: a server can override
+the template or pass it options, and the tokens a model sampled need not be how
+its tokenizer would split the same text. vLLM returns them on request —
+`return_token_ids` on a chat completion adds `prompt_token_ids`, and each
+choice's `token_ids` — but the adapter keeps no field it does not know, so a
+proxy between the harness and the server records them. That is what
+[`stream = false`](configuration.md#provider-profiles) is for.
+
+**A sequence no server produced** — a student's, built from a teacher's
+sessions — you render with the student's tokenizer:
+
+1. **The messages, with every turn's reasoning.** A Chat Completions adapter
+   whose profile sets `replay_reasoning_field` writes them from the last
+   request and its reply. Then take the reasoning off any turn the student
+   will not see it on — the table in
+   [providers.md](providers.md#on-open-weights-the-chat-template-decides)
+   gives the rule for each model. Reasoning a vendor signed — Anthropic's, or
+   OpenAI's through Responses — never goes into Chat Completions messages, so a
+   session recorded on one has none to give.
+2. **Tool arguments in the type the template reads** — the last column of
+   that table.
+3. **Render, then tokenize without adding special tokens** — the template has
+   written them already. For DeepSeek-V4, `encoding_dsv4.encode_messages`
+   renders, with the tools on the system message.
+4. **The loss mask.** What the model generated on a turn is what a render
+   including it adds to a render that stops before it, with the generation
+   prompt. That holds only while the template leaves earlier turns alone,
+   which the assert checks.
+
+For Qwen3.5, which renders through `transformers` and `jinja2` — neither a
+dependency of the harness:
+
+```python
+import json
+from dataclasses import replace
+
+from transformers import AutoTokenizer
+
+from lab_harness.config import profile_defaults
+from lab_harness.llm.providers import ChatCompletionsProvider
+from lab_harness.session import read_transcript, recorded_requests
+
+last = recorded_requests(read_transcript(path))[-1]
+trajectory = replace(last.request, messages=(*last.request.messages, last.response))
+adapter = ChatCompletionsProvider(
+    replace(profile_defaults(), replay_reasoning_field="reasoning_content")
+)
+body = adapter.request_body(last.model, trajectory)
+messages, tools = body["messages"], body.get("tools")
+for message in messages:
+    for call in message.get("tool_calls") or ():
+        call["function"]["arguments"] = json.loads(call["function"]["arguments"])
+
+tok = AutoTokenizer.from_pretrained("Qwen/Qwen3.5-9B")
+
+
+def render(msgs, **kwargs):
+    return tok.apply_chat_template(msgs, tools=tools, tokenize=False, **kwargs)
+
+
+text = render(messages)
+spans = []  # what the model generated, as character ranges of `text`
+for i, message in enumerate(messages):
+    if message["role"] == "assistant":
+        prompt = render(messages[:i], add_generation_prompt=True)
+        full = render(messages[: i + 1])
+        assert full.startswith(prompt) and text.startswith(full)
+        # up to <|im_end|>, where generation stops, not the newline after it
+        spans.append((len(prompt), full.rindex("<|im_end|>") + len("<|im_end|>")))
+
+encoded = tok(text, add_special_tokens=False, return_offsets_mapping=True)
+labels = [
+    token if any(a <= s and e <= b for a, b in spans) else -100
+    for token, (s, e) in zip(encoded["input_ids"], encoded["offset_mapping"])
+]
+```
+
+A span starts after `<think>\n`, because Qwen3.5's generation prompt ends with
+it. Where the student is served by vLLM, its `/tokenize` endpoint takes the
+same `messages` and `tools` and returns the ids it would use; comparing once
+catches a template the server overrides, options it passes, or arguments it
+parses differently.
 
 ### Changes mid-session
 

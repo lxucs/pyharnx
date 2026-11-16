@@ -280,38 +280,42 @@ reasoning.
 
 Nothing in Chat Completions says what a server does with reasoning sent back:
 OpenAI's spec has no field for it. For a hosted vendor its docs are the rule,
-as above. A
-server running open weights — vLLM, SGLang — passes each message's fields to
-the model's chat template, and the template decides whether a field is read,
-under which name, and which earlier turns keep it. So for a given model the
-contract is fixed, and it differs between models:
+as above. A server running open weights — vLLM, SGLang — passes each message's
+fields to the model's chat template, and the template decides whether a field
+is read, under which name, and which earlier turns keep it. So for a given
+model the contract is fixed, and it differs between models:
 
 | Model | Reasoning read from | Earlier turns that keep it | Tool `arguments` |
 |---|---|---|---|
 | Qwen3 | `reasoning_content`, else `<think>…</think>` split out of `content` | those after the last user message; tool results do not count as one | string or object |
+| Qwen3.5 | the same | the same | object only |
 | GLM-5.3 | the same | all of them; with `clear_thinking=true`, only those after the last user message | object only |
 | DeepSeek-V4 | `reasoning_content` | all of them when the request declares tools; otherwise only those after the last user message | JSON string |
 
 Read from what each model's repository publishes, as of 2026-11: Qwen3-8B's
-`chat_template`, GLM-5.3's `chat_template.jinja`, and DeepSeek-V4's
-`encoding/encoding_dsv4.py` — DeepSeek ships a Python encoder rather than a
-Jinja template, which each server reimplements. Other variants ship templates
-of their own; read the one you serve. The last column matters only when
-rendering a template yourself: the wire sends a string, which a server serving
-GLM has to parse first.
+`chat_template`, the `chat_template.jinja` of Qwen3.5 (one for every size) and
+of GLM-5.3, and DeepSeek-V4's `encoding/encoding_dsv4.py` — DeepSeek ships a
+Python encoder rather than a Jinja template, which each server reimplements.
+Other variants ship templates of their own; read the one you serve. The last
+column matters only when rendering a template yourself: the wire sends a
+string, which a server serving Qwen3.5 or GLM has to parse first.
 
 **Keeping is not sending.** A turn whose reasoning the template would keep, but
 that arrives without it, renders as if the model had not thought: no think
-block for Qwen3, an empty one for GLM and DeepSeek. In an agent run every
-assistant turn follows the one user message, so all three put the model's
-earlier reasoning back in front of it — if the harness sends it. A profile
-serving one of them therefore sets `replay_reasoning_field =
-"reasoning_content"`. Not `preserve_thinking`: on a GLM you serve,
+block for Qwen3, an empty one for the others. So a profile serving one of these
+sets `replay_reasoning_field = "reasoning_content"`; without it the model sees
+none of its earlier reasoning. Not `preserve_thinking`: on a GLM you serve,
 `clear_thinking` is a template argument whose default already keeps the
 reasoning.
 
+**A second user message is where they differ.** With a single one, every
+assistant turn follows it, so all four show the model all of its earlier
+reasoning. A follow-up prompt, a resumed session or a `finish_turn` hook's
+`continue_with` adds another, and Qwen3 and Qwen3.5 then drop the reasoning of
+every turn before it — as does DeepSeek-V4 in a run with no tools.
+
 The same rules decide what a training sample built from a recorded session
-([sessions.md](sessions.md#as-the-provider-received-it)) should show: the
+([sessions.md](sessions.md#as-the-model-read-it)) should show: the
 reasoning the model being trained will see when it runs, which need not be
 what the model that recorded the session saw.
 
