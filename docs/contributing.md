@@ -251,8 +251,12 @@ anywhere.
 
 ```bash
 uv version --bump patch            # or minor; edits pyproject.toml and uv.lock
-# set `version` in CITATION.cff to match, then commit
+# set `version` and `date-released` in CITATION.cff to match, then commit
 git tag v$(uv version --short) && git push origin v$(uv version --short)
 ```
+
+Then publish a GitHub release from the tag. Zenodo archives it and gives the
+release a DOI of its own; the concept DOI in `CITATION.cff` stays, and now
+resolves to it.
 
 PyPI never takes a version back, so a broken release is fixed by the next one.

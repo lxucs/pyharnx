@@ -3,6 +3,8 @@
 [![CI](https://github.com/lxucs/pyharnx/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/lxucs/pyharnx/actions/workflows/ci.yml)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue)](https://github.com/lxucs/pyharnx/blob/main/pyproject.toml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](https://github.com/lxucs/pyharnx/blob/main/LICENSE)
+[![PyPI](https://img.shields.io/pypi/v/pyharnx)](https://pypi.org/project/pyharnx/)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.24283575.svg)](https://doi.org/10.5281/zenodo.24283575)
 
 pyharnx is **a minimal agent harness built for experiments, and a lightweight 
 Python alternative to [pi](https://github.com/earendil-works/pi)**, short for
@@ -232,6 +234,8 @@ needs, and why those are left out: [docs/README.md](https://github.com/lxucs/pyh
 
 If pyharnx helps your research, GitHub's **Cite this repository** button
 gives a citation in APA or BibTeX, from [CITATION.cff](https://github.com/lxucs/pyharnx/blob/main/CITATION.cff).
+Its DOI, [10.5281/zenodo.24283575](https://doi.org/10.5281/zenodo.24283575),
+resolves to the latest release; each release's Zenodo record has one of its own.
 
 ## License
 
