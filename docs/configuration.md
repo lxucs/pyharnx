@@ -275,8 +275,9 @@ named field of each earlier assistant message. DeepSeek returns a 400 for a
 tool loop without it and GLM asks for it, so both shipped profiles set
 `"reasoning_content"`. A profile you add starts at `""` — none sent — because a
 server that never asked for the field may reject it. Set it only when the
-vendor's docs ask; [providers.md](providers.md#how-thinking-is-handled-across-models)
-has the per-vendor rules.
+vendor's docs ask, or for a model you serve, when its chat template reads it;
+[providers.md](providers.md#how-thinking-is-handled-across-models) has the
+rules for both.
 
 **`preserve_thinking` asks GLM to keep it.** GLM's standard endpoint discards
 earlier reasoning unless the request says `thinking.clear_thinking: false`, so

@@ -276,6 +276,45 @@ covers *all* earlier turns, so a session started elsewhere and resumed on
 DeepSeek with tools may be refused for the turns that carry no DeepSeek
 reasoning.
 
+### On open weights, the chat template decides
+
+Nothing in Chat Completions says what a server does with reasoning sent back:
+OpenAI's spec has no field for it. For a hosted vendor its docs are the rule,
+as above. A
+server running open weights — vLLM, SGLang — passes each message's fields to
+the model's chat template, and the template decides whether a field is read,
+under which name, and which earlier turns keep it. So for a given model the
+contract is fixed, and it differs between models:
+
+| Model | Reasoning read from | Earlier turns that keep it | Tool `arguments` |
+|---|---|---|---|
+| Qwen3 | `reasoning_content`, else `<think>…</think>` split out of `content` | those after the last user message; tool results do not count as one | string or object |
+| GLM-5.3 | the same | all of them; with `clear_thinking=true`, only those after the last user message | object only |
+| DeepSeek-V4 | `reasoning_content` | all of them when the request declares tools; otherwise only those after the last user message | JSON string |
+
+Read from what each model's repository publishes, as of 2026-11: Qwen3-8B's
+`chat_template`, GLM-5.3's `chat_template.jinja`, and DeepSeek-V4's
+`encoding/encoding_dsv4.py` — DeepSeek ships a Python encoder rather than a
+Jinja template, which each server reimplements. Other variants ship templates
+of their own; read the one you serve. The last column matters only when
+rendering a template yourself: the wire sends a string, which a server serving
+GLM has to parse first.
+
+**Keeping is not sending.** A turn whose reasoning the template would keep, but
+that arrives without it, renders as if the model had not thought: no think
+block for Qwen3, an empty one for GLM and DeepSeek. In an agent run every
+assistant turn follows the one user message, so all three put the model's
+earlier reasoning back in front of it — if the harness sends it. A profile
+serving one of them therefore sets `replay_reasoning_field =
+"reasoning_content"`. Not `preserve_thinking`: on a GLM you serve,
+`clear_thinking` is a template argument whose default already keeps the
+reasoning.
+
+The same rules decide what a training sample built from a recorded session
+([sessions.md](sessions.md#as-the-provider-received-it)) should show: the
+reasoning the model being trained will see when it runs, which need not be
+what the model that recorded the session saw.
+
 ## The Chat Completions adapter
 
 `lab_harness/llm/providers/chat_completions.py`. Raw `httpx` rather than the
@@ -389,7 +428,9 @@ goes back in. The shipped `deepseek` and `glm` profiles set
 `"reasoning_content"`; every other profile starts at `""`, sending none. Set it
 for a reasoning vendor only when its docs ask for reasoning back, and to the
 field they name — a vendor that wants it and does not get it may refuse the
-request, and one that does not want it may refuse the unknown field.
+request, and one that does not want it may refuse the unknown field. For open
+weights you serve yourself, the model's chat template is the docs: see
+[On open weights, the chat template decides](#on-open-weights-the-chat-template-decides).
 
 `preserve_thinking` adds `"thinking": {"type": "enabled", "clear_thinking":
 false}` — GLM's Preserved Thinking, exactly as Z.ai documents it. Only the

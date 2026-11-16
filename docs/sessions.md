@@ -119,6 +119,11 @@ always include the reasoning, even under a profile that sends none back.
 [trajectories.py](../examples/trajectories.py) `--wire` writes both, one line
 per request. Tests check the rebuilt body against what each adapter posted.
 
+Whether the model was then shown the reasoning a request carried is up to its
+chat template, which differs by model;
+[providers.md](providers.md#on-open-weights-the-chat-template-decides) has the
+rules for Qwen3, GLM and DeepSeek.
+
 The token sequence itself — after the chat template, with the model's special
 tokens — is not recoverable from a session. Only the inference server has it,
 and only one serving open weights can return it.
