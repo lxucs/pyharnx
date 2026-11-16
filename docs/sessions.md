@@ -121,42 +121,38 @@ per request. Tests check the rebuilt body against what each adapter posted.
 
 ### As the model read it
 
-The token sequence — the messages after the model's chat template, special
-tokens and all — is not in a session. Where it comes from depends on which one
-you want.
+The token sequence — messages after the model's chat template, special tokens
+and all — is not in a session.
 
-**The ids a server used**, for RL or anything else on-policy, only that server
-has. Rendering the text again need not reproduce them: a server can override
-the template or pass it options, and the tokens a model sampled need not be how
-its tokenizer would split the same text. vLLM returns them on request —
-`return_token_ids` on a chat completion adds `prompt_token_ids`, and each
-choice's `token_ids` — but the adapter keeps no field it does not know, so a
-proxy between the harness and the server records them. That is what
-[`stream = false`](configuration.md#provider-profiles) is for.
+**The ids a server used**, for RL or anything on-policy, only that server has.
+Rendering the text again need not reproduce them: the server may override the
+template or pass it options, and it renders earlier assistant turns differently
+once a later user message arrives (see
+[providers.md](providers.md#on-open-weights-the-chat-template-decides)). vLLM
+returns them when asked — `return_token_ids` adds `prompt_token_ids` and each
+choice's `token_ids` — and the adapter keeps no field it does not know, so a
+proxy between the harness and the server records them; `stream = false`
+([configuration.md](configuration.md#provider-profiles)) is for exactly that.
 
 **A sequence no server produced** — a student's, built from a teacher's
 sessions — you render with the student's tokenizer:
 
-1. **The messages, with every turn's reasoning.** A Chat Completions adapter
-   whose profile sets `replay_reasoning_field` writes them from the last
-   request and its reply. Then take the reasoning off any turn the student
-   will not see it on — the table in
-   [providers.md](providers.md#on-open-weights-the-chat-template-decides)
-   gives the rule for each model. Reasoning a vendor signed — Anthropic's, or
-   OpenAI's through Responses — never goes into Chat Completions messages, so a
-   session recorded on one has none to give.
-2. **Tool arguments in the type the template reads** — the last column of
-   that table.
-3. **Render, then tokenize without adding special tokens** — the template has
-   written them already. For DeepSeek-V4, `encoding_dsv4.encode_messages`
-   renders, with the tools on the system message.
-4. **The loss mask.** What the model generated on a turn is what a render
-   including it adds to a render that stops before it, with the generation
-   prompt. That holds only while the template leaves earlier turns alone,
-   which the assert checks.
+1. **Messages, from the last request and its reply**, written by a Chat
+   Completions adapter whose profile sets `replay_reasoning_field`. Drop the
+   reasoning of any turn the student will not see
+   ([providers.md](providers.md#on-open-weights-the-chat-template-decides) has
+   the rule). Signed reasoning (Anthropic's, or OpenAI's via Responses) never enters
+   Chat Completions messages, so a session recorded on one has none to give.
+2. **Tool arguments in the type the template reads** — the same table's last
+   column.
+3. **Render, then tokenize without adding special tokens.** DeepSeek-V4 renders
+   with `encoding_dsv4.encode_messages`, tools on the system message.
+4. **Mask the loss** to what the model generated: a render including a turn,
+   minus one stopping before it with the generation prompt. The assert checks
+   the template left earlier turns alone.
 
-For Qwen3.5, which renders through `transformers` and `jinja2` — neither a
-dependency of the harness:
+For Qwen3.5, which needs `transformers` and `jinja2` — neither a harness
+dependency:
 
 ```python
 import json
@@ -203,11 +199,10 @@ labels = [
 ]
 ```
 
-A span starts after `<think>\n`, because Qwen3.5's generation prompt ends with
-it. Where the student is served by vLLM, its `/tokenize` endpoint takes the
-same `messages` and `tools` and returns the ids it would use; comparing once
-catches a template the server overrides, options it passes, or arguments it
-parses differently.
+A span starts after `<think>\n`, where Qwen3.5's generation prompt ends. Before
+training, compare once with the server's own `/tokenize`, which takes the same
+`messages` and `tools`: it catches a template the server overrides, options it
+passes, or arguments it parses differently.
 
 ### Changes mid-session
 

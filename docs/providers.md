@@ -213,9 +213,8 @@ exactly as received — empty text included.
 
 ## How thinking is handled across models
 
-The hardest thing to make provider-neutral, because vendors disagree about
-whether reasoning is *visible* and whether it is *replayable* — and those are
-independent questions. So the core type asks both:
+Vendors disagree about whether reasoning is *visible* and whether it is
+*replayable* — independent questions, so the core type asks both:
 
 ```python
 class ThinkingBlock:
@@ -223,49 +222,48 @@ class ThinkingBlock:
     signature: str | None = None  # must you hand it back?
 ```
 
-That gives four regimes, and all four are reachable:
+**Only the last user turn's reasoning survives.** Nearly every template and
+hosted endpoint keeps the reasoning of the assistant turns after the most
+recent user message, and drops it from everything before — a turn's reasoning
+is a scratchpad, not memory. Two things follow:
+
+- **A new user message re-prefills the earlier assistant turns**, which now
+  render differently. In a chat that is the last answer and the new question;
+  in an agent run whose follow-up arrives, it is the whole tool loop. Within
+  one tool loop nothing moves, so each request there is a plain append.
+- **Reasoning that was dropped is not part of the model's context**, so a
+  training sample built from a session should not show it either.
+
+A dropped turn renders the same whether or not its reasoning was sent — for
+Qwen3, byte for byte. Send it anyway where the template keeps it (GLM-5.3, and
+DeepSeek-V4 when the request declares tools) or where the vendor requires it
+(DeepSeek returns a 400 for a tool loop without it).
 
 | Provider | `thinking` | `signature` | Replayed? |
 |---|---|---|---|
 | Anthropic | a **summary** on the 5-series ([asked for](#the-thinking-request)); the text before | the signed token | **Yes** — the API rejects it without the signature |
 | OpenAI via `responses` | a model-written **summary** | packed `{id, encrypted_content}` | **Yes** — verbatim, or the model loses its place |
 | DeepSeek, GLM | the real chain, in plaintext | `None` | **Yes** — as plain `reasoning_content`; DeepSeek returns a 400 for a tool loop without it |
-| OpenAI via `chat_completions` | *no block at all* | — | nothing to replay |
+| OpenAI via `chat_completions` | none — it streams no reasoning there | — | nothing to replay |
 
-**Why OpenAI needs the replay.** A reasoning model thinks, calls a tool, and
-then has to resume from where it left off. OpenAI never returns the raw chain;
-it returns a summary you can show a user and an opaque `encrypted_content`
-blob that is the actual continuation. Drop the blob and nothing errors — the
-model just restarts its reasoning after every tool call, silently and worse.
-That is the whole reason `responses.py` exists.
+OpenAI never returns the raw chain: only a summary, plus an opaque
+`encrypted_content` blob that *is* the continuation. Drop the blob and nothing
+errors — the model silently restarts its reasoning after every tool call. That
+is why `responses.py` exists, and why `signature` holds JSON there: a replay
+needs the item's `id` as well as the ciphertext, packed into the one field the
+core treats as an opaque token. Chat Completions still counts reasoning tokens
+in `output`, but has nothing to break them out with — `Usage` has no field for
+it.
 
-**Why the signature holds JSON there.** Replaying needs the item's `id` as
-well as the ciphertext. Rather than add an OpenAI-shaped field to
-`llm/types.py`, the adapter packs both into the one field the core already
-documents as *an opaque provider replay token* — and it is the only thing that
-ever looks inside.
+DeepSeek and GLM hand back plain text with no token. DeepSeek requires it:
+with `tools`, every earlier turn's `reasoning_content` must return, turns that
+called no tool included, or the API answers 400. GLM asks for it unmodified,
+but its standard endpoint discards it unless the request opts into *Preserved
+Thinking* — the shipped `glm` profile does, with `preserve_thinking`.
 
-**The last row is not a bug.** On Chat Completions, OpenAI's reasoning models
-stream no reasoning content whatsoever, so no block is created. Absence is the
-honest representation; there is genuinely nothing to show. (The token count is
-still right: `output` includes reasoning tokens. What is lost is the ability to
-*break out* how many — the core `Usage` has no field for it.)
-
-**Why DeepSeek and GLM need it too.** No token to hand back, but the text
-itself. DeepSeek's rule depends on the request: with `tools`, every earlier
-turn's `reasoning_content` must come back — including turns that called no
-tool — or the API returns a 400; without `tools` it is ignored. GLM asks for it
-complete and unmodified, and says dropping it costs quality and cache hits —
-but its standard endpoint discards it anyway unless the request opts into
-*Preserved Thinking*, so the shipped `glm` profile also sets
-`preserve_thinking`. Both cache by prefix, so the text goes back byte for byte
-as it streamed.
-
-This used to be the other way round: DeepSeek once rejected reasoning sent
-back. Replay is therefore a per-profile setting, `replay_reasoning_field`, on
-for the shipped `deepseek` and `glm` profiles and off for any profile you add —
-a server that never asked for the field may reject it. See
-[Profiles](#profiles).
+Replay is therefore per profile: `replay_reasoning_field`, on for the shipped
+`deepseek` and `glm` profiles and off for any profile you add, since a server
+that never asked for the field may reject it. See [Profiles](#profiles).
 
 **Mixing providers mostly degrades.** Each adapter drops reasoning it cannot
 legitimately replay: a signature-less block never reaches Anthropic or
@@ -278,46 +276,31 @@ reasoning.
 
 ### On open weights, the chat template decides
 
-Nothing in Chat Completions says what a server does with reasoning sent back:
-OpenAI's spec has no field for it. For a hosted vendor its docs are the rule,
-as above. A server running open weights — vLLM, SGLang — passes each message's
-fields to the model's chat template, and the template decides whether a field
-is read, under which name, and which earlier turns keep it. So for a given
-model the contract is fixed, and it differs between models:
+Chat Completions has no field for reasoning sent back — for a hosted vendor its
+docs are the rule, as above. A server on open weights (vLLM, SGLang) passes the
+messages to the model's chat template, and the template decides whether it
+reads the reasoning, under which name, and which turns keep it. So the
+contract is fixed per model, and differs between models:
 
-| Model | Reasoning read from | Earlier turns that keep it | Tool `arguments` |
+| Model | Reasoning read from | Turns that keep it | Tool `arguments` |
 |---|---|---|---|
-| Qwen3 | `reasoning_content`, else `<think>…</think>` split out of `content` | those after the last user message; tool results do not count as one | string or object |
+| Qwen3 | `reasoning_content`, else `<think>…</think>` split out of `content` | the last user message's, tool results aside | string or object |
 | Qwen3.5 | the same | the same | object only |
-| GLM-5.3 | the same | all of them; with `clear_thinking=true`, only those after the last user message | object only |
-| DeepSeek-V4 | `reasoning_content` | all of them when the request declares tools; otherwise only those after the last user message | JSON string |
+| GLM-5.3 | the same | every turn, unless `clear_thinking=true` | object only |
+| DeepSeek-V4 | `reasoning_content` | every turn when the request declares tools | JSON string |
 
-Read from what each model's repository publishes, as of 2026-11: Qwen3-8B's
-`chat_template`, the `chat_template.jinja` of Qwen3.5 (one for every size) and
-of GLM-5.3, and DeepSeek-V4's `encoding/encoding_dsv4.py` — DeepSeek ships a
-Python encoder rather than a Jinja template, which each server reimplements.
-Other variants ship templates of their own; read the one you serve. The last
-column matters only when rendering a template yourself: the wire sends a
-string, which a server serving Qwen3.5 or GLM has to parse first.
+Read from each repository's published template, as of 2026-11: Qwen3-8B's
+`chat_template`, those of Qwen3.5 (one for every size) and GLM-5.3, and
+DeepSeek-V4's `encoding/encoding_dsv4.py` — a Python encoder rather than Jinja,
+which each server reimplements. Read the one you serve. The last column matters
+only when rendering a template yourself.
 
-**Keeping is not sending.** A turn whose reasoning the template would keep, but
-that arrives without it, renders as if the model had not thought: no think
-block for Qwen3, an empty one for the others. So a profile serving one of these
-sets `replay_reasoning_field = "reasoning_content"`; without it the model sees
-none of its earlier reasoning. Not `preserve_thinking`: on a GLM you serve,
-`clear_thinking` is a template argument whose default already keeps the
-reasoning.
-
-**A second user message is where they differ.** With a single one, every
-assistant turn follows it, so all four show the model all of its earlier
-reasoning. A follow-up prompt, a resumed session or a `finish_turn` hook's
-`continue_with` adds another, and Qwen3 and Qwen3.5 then drop the reasoning of
-every turn before it — as does DeepSeek-V4 in a run with no tools.
-
-The same rules decide what a training sample built from a recorded session
-([sessions.md](sessions.md#as-the-model-read-it)) should show: the
-reasoning the model being trained will see when it runs, which need not be
-what the model that recorded the session saw.
+Kept is not sent: a turn whose reasoning the template would keep, but that
+arrives without it, renders as one the model never thought — no think block for
+Qwen3, an empty one for the others. So a profile serving one of these sets
+`replay_reasoning_field = "reasoning_content"`. Not `preserve_thinking`: on a
+GLM you serve, `clear_thinking` is a template argument that keeps it by
+default.
 
 ## The Chat Completions adapter
 
