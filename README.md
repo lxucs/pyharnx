@@ -10,7 +10,8 @@ pyharnx is **a minimal agent harness built for experiments, a lightweight
 Python alternative to [pi](https://github.com/earendil-works/pi)**, short for
 **Py**thon **harn**ess for e**x**periments. 
 
-It has a clean agentic loop, friendly for research experiments in python.
+It has a clean agentic loop, friendly for research experiments in python, with
+build-in support to visualize full trajectories for training or debug.
 The code is small enough to read in an afternoon, and complete enough to run end to end.
 
 pyharnx keeps pi's layering — `llm/` for pi-ai, `agent/` for pi-agent-core, a pure
