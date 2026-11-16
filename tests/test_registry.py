@@ -10,8 +10,8 @@ from pathlib import Path
 
 import pytest
 
-from lab_harness import config as config_module
-from lab_harness.config import (
+from pyharnx import config as config_module
+from pyharnx.config import (
     AgentConfig,
     AnthropicConfig,
     Config,
@@ -22,8 +22,8 @@ from lab_harness.config import (
     _defaults,
     model_defaults,
 )
-from lab_harness.llm.providers import ANTHROPIC
-from lab_harness.llm.registry import resolve_model
+from pyharnx.llm.providers import ANTHROPIC
+from pyharnx.llm.registry import resolve_model
 from tests.entries import model_entry
 
 
@@ -150,12 +150,12 @@ def test_the_env_var_name_comes_from_config(monkeypatch: pytest.MonkeyPatch) -> 
     """The *name* is a config key, so a deployment renames it without a patch."""
     config = agent(model_env="DEPLOYMENT_MODEL")
     monkeypatch.setenv("DEPLOYMENT_MODEL", "claude-opus-5")
-    monkeypatch.setenv("LAB_HARNESS_MODEL", "claude-haiku-4-5-20251001")
+    monkeypatch.setenv("PYHARNX_MODEL", "claude-haiku-4-5-20251001")
     assert resolve_model(config=config).id == "claude-opus-5"
 
 
 def test_an_empty_env_var_is_ignored(monkeypatch: pytest.MonkeyPatch) -> None:
-    """`LAB_HARNESS_MODEL=` is an unset variable, not a request for a nameless model."""
+    """`PYHARNX_MODEL=` is an unset variable, not a request for a nameless model."""
     config = agent(model="claude-opus-5")
     monkeypatch.setenv(config.agent.model_env, "")
     assert resolve_model(config=config).id == "claude-opus-5"

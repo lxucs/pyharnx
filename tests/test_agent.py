@@ -3,10 +3,10 @@ from typing import Any
 
 import pytest
 
-from lab_harness.agent.agent import Agent
-from lab_harness.agent.types import AgentEvent, ExecutionMode, ToolContext, ToolResult
-from lab_harness.llm.fake import FAKE_MODEL, FakeProvider, text_response, tool_call_response
-from lab_harness.llm.types import AssistantMessage, TextBlock, ToolCallBlock, UserMessage, text
+from pyharnx.agent.agent import Agent
+from pyharnx.agent.types import AgentEvent, ExecutionMode, ToolContext, ToolResult
+from pyharnx.llm.fake import FAKE_MODEL, FakeProvider, text_response, tool_call_response
+from pyharnx.llm.types import AssistantMessage, TextBlock, ToolCallBlock, UserMessage, text
 
 
 def _agent(provider: FakeProvider, **kwargs: Any) -> Agent:

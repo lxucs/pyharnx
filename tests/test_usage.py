@@ -8,7 +8,7 @@ from dataclasses import replace
 
 import pytest
 
-from lab_harness.cli.usage import (
+from pyharnx.cli.usage import (
     cache_hit_rate,
     format_cost,
     format_effort,
@@ -18,9 +18,9 @@ from lab_harness.cli.usage import (
     price_for,
     summarize,
 )
-from lab_harness.config import PricingConfig
-from lab_harness.llm.fake import FAKE_MODEL
-from lab_harness.llm.types import AssistantMessage, Model, Usage, UserMessage, text
+from pyharnx.config import PricingConfig
+from pyharnx.llm.fake import FAKE_MODEL
+from pyharnx.llm.types import AssistantMessage, Model, Usage, UserMessage, text
 from tests.entries import model_entry
 
 PRICED = "priced-model"

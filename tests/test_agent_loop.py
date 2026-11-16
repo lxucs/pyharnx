@@ -5,8 +5,8 @@ from typing import Any
 
 import pytest
 
-from lab_harness.agent.loop import run_agent_loop
-from lab_harness.agent.types import (
+from pyharnx.agent.loop import run_agent_loop
+from pyharnx.agent.types import (
     AfterToolCallContext,
     AfterToolCallResult,
     AgentContext,
@@ -34,8 +34,8 @@ from lab_harness.agent.types import (
     ToolResult,
     declarations_for,
 )
-from lab_harness.config import Config
-from lab_harness.llm.fake import (
+from pyharnx.config import Config
+from pyharnx.llm.fake import (
     FAKE_MODEL,
     FakeProvider,
     error_response,
@@ -43,7 +43,7 @@ from lab_harness.llm.fake import (
     tool_call_response,
     truncated_tool_call_response,
 )
-from lab_harness.llm.types import (
+from pyharnx.llm.types import (
     AssistantMessage,
     TextBlock,
     ToolCallBlock,
@@ -361,7 +361,7 @@ async def test_prepare_request_can_replace_messages() -> None:
     replacement = (UserMessage(content=text("replaced")),)
 
     async def replace(ctx: object) -> object:
-        from lab_harness.agent.types import RequestUpdate
+        from pyharnx.agent.types import RequestUpdate
 
         return RequestUpdate(messages=replacement)
 
@@ -430,6 +430,29 @@ async def test_a_hook_that_changes_nothing_announces_nothing(update: RequestUpda
     assert not [e for e in events if isinstance(e, RequestRewritten)]
 
 
+async def test_a_failing_prepare_request_ends_the_run_with_an_error() -> None:
+    """Nothing is sent: the history unchanged may be what the hook was there to
+    stop — too long to fit, or holding what it redacts. The run still ends the
+    way every run does, so a subscriber sees an error turn and `agent_end`."""
+    events, emit = _collector()
+
+    async def boom(request: PrepareRequestContext) -> RequestUpdate | None:
+        raise RuntimeError("hook exploded")
+
+    provider = FakeProvider([text_response("never sent")])
+    messages = await run_agent_loop(_ctx(), _cfg(provider, prepare_request=boom), emit)
+
+    assert provider.requests == []
+    [failed] = messages
+    assert isinstance(failed, AssistantMessage)
+    assert failed.stop_reason == "error"
+    assert "hook exploded" in (failed.error_message or "")
+    ends = [e for e in events if isinstance(e, MessageEnd)]
+    assert [e.message for e in ends][-1] is failed
+    assert isinstance(events[-1], AgentEnd)
+    assert events[-1].messages == (failed,)
+
+
 async def test_max_turns_stops_a_runaway_loop() -> None:
     tool = RecordingTool()
     call = ToolCallBlock(id="c1", name="echo", arguments={})
@@ -439,7 +462,7 @@ async def test_max_turns_stops_a_runaway_loop() -> None:
 
     from dataclasses import replace as dc_replace
 
-    from lab_harness.config import AgentConfig
+    from pyharnx.config import AgentConfig
 
     cfg = LoopConfig(
         model=FAKE_MODEL,
@@ -461,7 +484,7 @@ async def test_exhausting_max_turns_is_reported(caplog: pytest.LogCaptureFixture
     """
     from dataclasses import replace as dc_replace
 
-    from lab_harness.config import AgentConfig
+    from pyharnx.config import AgentConfig
 
     tool = RecordingTool()
     call = ToolCallBlock(id="c1", name="echo", arguments={})
@@ -473,7 +496,7 @@ async def test_exhausting_max_turns_is_reported(caplog: pytest.LogCaptureFixture
         config=dc_replace(Config(), agent=AgentConfig(max_turns=2)),
     )
 
-    with caplog.at_level(logging.WARNING, logger="lab_harness.agent.loop"):
+    with caplog.at_level(logging.WARNING, logger="pyharnx.agent.loop"):
         await run_agent_loop(_ctx(tool), cfg, emit)
 
     assert any("max_turns=2" in record.message for record in caplog.records)
@@ -486,7 +509,7 @@ async def test_a_run_that_finishes_normally_does_not_report_the_limit(
     provider = FakeProvider([text_response("done")])
     _, emit = _collector()
 
-    with caplog.at_level(logging.WARNING, logger="lab_harness.agent.loop"):
+    with caplog.at_level(logging.WARNING, logger="pyharnx.agent.loop"):
         await run_agent_loop(_ctx(), _cfg(provider), emit)
 
     assert not [r for r in caplog.records if "max_turns" in r.message]
@@ -609,7 +632,7 @@ async def test_raising_subscriber_does_not_break_the_run(
         seen.append(event.type)
         raise RuntimeError(f"subscriber exploded on {event.type}")
 
-    with caplog.at_level(logging.ERROR, logger="lab_harness.agent.loop"):
+    with caplog.at_level(logging.ERROR, logger="pyharnx.agent.loop"):
         messages = await run_agent_loop(_ctx(tool), _cfg(provider), hostile)
 
     assert tool.calls == [{}]
@@ -708,7 +731,7 @@ async def test_abort_during_parallel_batch_is_reported_on_the_last_turn() -> Non
     the batch would go unreported."""
     from dataclasses import replace as dc_replace
 
-    from lab_harness.config import AgentConfig
+    from pyharnx.config import AgentConfig
 
     signal = asyncio.Event()
 
@@ -835,7 +858,7 @@ async def test_failing_update_emit_is_observable_not_an_orphaned_task(
     # Attributed to the loop's own logger. A fire-and-forget task instead
     # surfaces this as asyncio's "Task exception was never retrieved" dump,
     # which lands on the `asyncio` logger at an unpredictable time.
-    ours = [r for r in caplog.records if r.name == "lab_harness.agent.loop" and r.exc_info]
+    ours = [r for r in caplog.records if r.name == "pyharnx.agent.loop" and r.exc_info]
     assert ours, f"expected a loop-logged failure, got {[r.name for r in caplog.records]}"
     assert not any(r.name == "asyncio" for r in caplog.records)
     # The run survived.
@@ -1036,7 +1059,7 @@ async def test_auto_continue_is_bounded_by_max_turns() -> None:
     """A hook that always continues must not loop forever."""
     from dataclasses import replace as dc_replace
 
-    from lab_harness.config import AgentConfig
+    from pyharnx.config import AgentConfig
 
     provider = FakeProvider([text_response(f"turn {i}") for i in range(20)])
     _, emit = _collector()

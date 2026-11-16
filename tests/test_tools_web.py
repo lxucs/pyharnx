@@ -6,16 +6,17 @@ ddgs gets an injected callable in place of the package. The canned Tavily
 payloads are the shapes the live API actually returned, not invented ones.
 """
 
+from collections.abc import AsyncIterator
 from dataclasses import replace
 from typing import Any
 
 import httpx
 import pytest
 
-from lab_harness.config import Config, DdgsConfig, TavilyConfig, WebConfig
-from lab_harness.tools import web
-from lab_harness.tools.base import ToolContext
-from lab_harness.tools.web import (
+from pyharnx.config import Config, DdgsConfig, TavilyConfig, WebConfig
+from pyharnx.tools import web
+from pyharnx.tools.base import ToolContext
+from pyharnx.tools.web import (
     BACKENDS,
     DdgsBackend,
     SearchError,
@@ -317,6 +318,15 @@ async def test_web_search_uses_the_configured_result_count(
     assert FakeBackend.seen[1] == 9
 
 
+async def test_a_requested_result_count_is_capped_by_config(
+    fake_backend: type[FakeBackend],
+) -> None:
+    """Like bash's timeout: a call may ask for more, up to the configured ceiling."""
+    config = web_config(backend="fake", max_requested_results=3)
+    await web_search.execute({"query": "q", "max_results": 10}, context(config))
+    assert FakeBackend.seen[1] == 3
+
+
 async def test_an_explicit_limit_overrides_the_configured_one(
     fake_backend: type[FakeBackend],
 ) -> None:
@@ -447,12 +457,43 @@ async def test_an_explicit_max_chars_overrides_config(fetch: Any) -> None:
     assert "truncated at 600 characters" in result.content[0].text  # type: ignore[union-attr]
 
 
+async def test_a_requested_character_budget_is_raised_to_the_configured_floor(
+    fetch: Any,
+) -> None:
+    """Below the floor a page is mostly its title: not worth a request."""
+    fetch(page(f"<p>{'x' * 5000}</p>"))
+    result = await web_fetch.execute(
+        {"url": "https://e.com", "max_chars": 100},
+        context(web_config(min_content_chars=800)),
+    )
+    assert "truncated at 800 characters" in result.content[0].text  # type: ignore[union-attr]
+
+
 async def test_the_download_is_capped_before_extraction(fetch: Any) -> None:
     """max_bytes guards memory; max_content_chars guards context. Both apply."""
     fetch(page(f"<p>{'y' * 100_000}</p>"))
     result = await web_fetch.execute({"url": "https://e.com"}, context(web_config(max_bytes=1000)))
     assert result.details["status"] == 200
     assert len(result.content[0].text) < 2000  # type: ignore[union-attr]
+
+
+async def test_the_body_is_not_read_past_max_bytes(fetch: Any) -> None:
+    """The cap bounds the transfer, not only what is kept of it: a huge file
+    behind a link costs max_bytes, not its size."""
+    pulled: list[int] = []
+
+    async def body() -> AsyncIterator[bytes]:
+        for index in range(1000):
+            pulled.append(index)
+            yield b"z" * 1000
+
+    plain = {"content-type": "text/plain"}
+    fetch(lambda request: httpx.Response(200, content=body(), headers=plain))
+    result = await web_fetch.execute({"url": "https://e.com"}, context(web_config(max_bytes=5000)))
+
+    assert not result.is_error
+    assert result.content[0].text == "z" * 5000  # type: ignore[union-attr]
+    assert len(pulled) < 10
 
 
 async def test_the_resolved_url_is_reported(fetch: Any) -> None:

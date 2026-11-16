@@ -4,12 +4,12 @@
 
 **Nothing tunable is hardcoded.** Models, timeouts, retry counts, truncation
 limits, directory locations, default tool sets, prompts — all of it resolves
-from config. The schema in `lab_harness/config.py` is the single list of every
+from config. The schema in `pyharnx/config.py` is the single list of every
 knob the system has, and every default lives there — except two kinds of data
 the package ships in config-file format:
-[`lab_harness/llm/catalog.toml`](../lab_harness/llm/catalog.toml), every LLM
+[`pyharnx/llm/catalog.toml`](../pyharnx/llm/catalog.toml), every LLM
 setting, and
-[`lab_harness/prompts/prompts.toml`](../lab_harness/prompts/prompts.toml), the
+[`pyharnx/prompts/prompts.toml`](../pyharnx/prompts/prompts.toml), the
 prompts.
 
 **Nothing sensitive is committed.** Keys, absolute paths, and private endpoints
@@ -21,13 +21,13 @@ in `config.toml`, docs, or tests. See the hygiene rules in
 
 Lowest to highest precedence:
 
-1. Schema defaults in `lab_harness/config.py`, every LLM setting in
-   `lab_harness/llm/catalog.toml`, and the prompts in
-   `lab_harness/prompts/prompts.toml`
-2. `~/.lab-harness/config.toml` — user config
-3. `~/.lab-harness/config.local.toml` — user-local, for keys
-4. `./.lab-harness/config.toml` — project config, committed
-5. `./.lab-harness/config.local.toml` — project-local, **gitignored**
+1. Schema defaults in `pyharnx/config.py`, every LLM setting in
+   `pyharnx/llm/catalog.toml`, and the prompts in
+   `pyharnx/prompts/prompts.toml`
+2. `~/.pyharnx/config.toml` — user config
+3. `~/.pyharnx/config.local.toml` — user-local, for keys
+4. `./.pyharnx/config.toml` — project config, committed
+5. `./.pyharnx/config.local.toml` — project-local, **gitignored**
 6. A file named explicitly — `load_config(config_file=...)`, which a program
    built on the harness passes as its own. Last of the files, so it wins over
    every discovered one
@@ -52,9 +52,9 @@ There is deliberately no generic environment-variable overlay. Each variable is
 read where it is used, and its *name* is itself a config key, so a deployment
 using different names changes config rather than code.
 
-Project files are located relative to `--cwd`, so `lab-harness --cwd
-../other-project` picks up that project's `.lab-harness/`, not this one's. The
-two in `~/.lab-harness/` (or `$LAB_HARNESS_HOME`) apply in every directory:
+Project files are located relative to `--cwd`, so `pyharnx --cwd
+../other-project` picks up that project's `.pyharnx/`, not this one's. The
+two in `~/.pyharnx/` (or `$PYHARNX_HOME`) apply in every directory:
 settings and keys you want wherever the harness runs go there.
 
 ## Files
@@ -63,22 +63,22 @@ settings and keys you want wherever the harness runs go there.
 |---|---|---|
 | `config.toml` | yes | Non-sensitive defaults — tool lists, feature flags, limits |
 | `config.local.toml` | **no** | Keys, absolute paths, private endpoints |
-| `config.example.toml` | yes | Template documenting every key but the LLM ones, placeholders only |
+| `config.example.toml` | yes | Template documenting every key but the LLM ones and the prompts, placeholders only |
 
 `config.toml` and `config.local.toml` are each read from home, then from the
 project. Only a project's `config.toml` is committed.
 
 ### `config.toml` — safe to commit
 
-Keys mirror the dataclass fields in `lab_harness/config.py`. Every value shown is
+Keys mirror the dataclass fields in `pyharnx/config.py`. Every value shown is
 the current default, so a key you do not set behaves exactly as written.
 
 ```toml
 [agent]
 max_turns = 50                   # ceiling on provider requests in one run
 parallel_tools = true            # run independent tool calls concurrently
-model = "gpt-6-luna"             # used when --model and $LAB_HARNESS_MODEL are absent
-model_env = "LAB_HARNESS_MODEL"  # NAME of the variable that overrides `model`
+model = "gpt-6-luna"             # used when --model and $PYHARNX_MODEL are absent
+model_env = "PYHARNX_MODEL"      # NAME of the variable that overrides `model`
 provider = "openai"              # for a model id nothing else routes
 reasoning_effort = ""            # for a model whose entry sets none; "" sends none
 
@@ -86,8 +86,8 @@ reasoning_effort = ""            # for a model whose entry sets none; "" sends n
 context_files = ["HARNESS.md", "AGENTS.md"]  # first one that exists is loaded
 max_bytes = 32000                            # longer files are truncated
 
-[prompts]               # ships in lab_harness/prompts/; see "Prompts" below
-system = "You are a helpful assistant running in a Lab Harness terminal …"
+[prompts]               # ships in pyharnx/prompts/; see "Prompts" below
+system = "You are a helpful assistant running in a pyharnx terminal …"
 harness = "# Harness\n - Text you output outside of tool use …"
 environment = "# Environment\n…\n - Primary working directory: {cwd}\n…"
 context_management = "# Context management\n…"
@@ -152,25 +152,28 @@ accent = "#d77757"
 prompt = "bold #d77757"
 
 [session]
-home = "~/.lab-harness" # root for state; $LAB_HARNESS_HOME overrides
+home = "~/.pyharnx" # root for state; $PYHARNX_HOME overrides
 history_file = "history" # typed lines, so a later session's Up recalls them
 enabled = true          # write transcripts at all; off means nothing persisted
-version = 4             # transcript schema version
+version = 5             # transcript schema version
 
 # Every LLM setting — [providers.anthropic], [providers.openai.<name>] and
-# [models.<id>] — ships in lab_harness/llm/catalog.toml, in this format; see
+# [models.<id>] — ships in pyharnx/llm/catalog.toml, in this format; see
 # "Provider profiles" and "Models" below.
 
 [logging]
 level = "warning"                    # debug | info | warning | error
-level_env = "LAB_HARNESS_LOG_LEVEL"  # NAME of the variable that overrides `level`
+level_env = "PYHARNX_LOG_LEVEL"      # NAME of the variable that overrides `level`
 format = "%(levelname)s %(name)s: %(message)s"
 ```
 
 Every key, with its default, is in
-[`.lab-harness/config.example.toml`](../.lab-harness/config.example.toml) —
+[`.pyharnx/config.example.toml`](../.pyharnx/config.example.toml) —
 except the LLM ones, which are all in
-[`lab_harness/llm/catalog.toml`](../lab_harness/llm/catalog.toml).
+[`pyharnx/llm/catalog.toml`](../pyharnx/llm/catalog.toml); the prompts, which
+ship in [`pyharnx/prompts/prompts.toml`](../pyharnx/prompts/prompts.toml); and
+Tavily's `api_key` and `base_url`, a credential and an endpoint, which belong
+in `config.local.toml`.
 
 ### `config.local.toml` — never committed
 
@@ -190,8 +193,8 @@ gateway in front of it is an environment setting.
 Prefer environment variables for secrets. `config.local.toml` is for
 machine-specific non-secret values, and for keys when env vars are inconvenient
 — a key that should survive across shells without living in a dotfile, say.
-A key you want in every project goes in `~/.lab-harness/config.local.toml`; one
-for this project alone, in `.lab-harness/config.local.toml`.
+A key you want in every project goes in `~/.pyharnx/config.local.toml`; one
+for this project alone, in `.pyharnx/config.local.toml`.
 
 Environment wins over both files, so a key in either can always be overridden.
 
@@ -207,7 +210,9 @@ Environment wins over both files, so a key in either can always be overridden.
 | `OPENAI_API_KEY` | Key for the `openai` profile |
 | `OPENAI_BASE_URL` | Endpoint for the `openai` profile |
 | `DEEPSEEK_API_KEY` | Key for the `deepseek` profile |
+| `DEEPSEEK_BASE_URL` | Endpoint for the `deepseek` profile |
 | `ZHIPUAI_API_KEY` | Key for the `glm` profile |
+| `ZHIPUAI_BASE_URL` | Endpoint for the `glm` profile |
 
 Every OpenAI-compatible profile names its own variables, so a profile you add
 brings its own (`providers.openai.<name>.api_key_env`).
@@ -227,16 +232,16 @@ The backend is chosen by `tools.web.backend` in config, not by an environment
 variable. Only Tavily needs a key; the `ddgs` backend needs none, and
 `web_fetch` never does. See [tools.md](tools.md#web-tools).
 
-### lab-harness
+### pyharnx
 
 | Variable | Purpose |
 |---|---|
-| `LAB_HARNESS_MODEL` | Override `agent.model`; `--model` still wins |
-| `LAB_HARNESS_HOME` | Override `session.home` |
-| `LAB_HARNESS_LOG_LEVEL` | Override `logging.level`; `--log-level` still wins |
+| `PYHARNX_MODEL` | Override `agent.model`; `--model` still wins |
+| `PYHARNX_HOME` | Override `session.home` |
+| `PYHARNX_LOG_LEVEL` | Override `logging.level`; `--log-level` still wins |
 
 Model resolution is the general precedence rule in miniature: `--model`, then
-`$LAB_HARNESS_MODEL`, then `agent.model` from config, which defaults to
+`$PYHARNX_MODEL`, then `agent.model` from config, which defaults to
 `gpt-6-luna`. An id the catalog has never heard of is **not** an error —
 it is given conservative limits rather than refused, because being unable to
 use a model released last week is worse than a slightly wrong `context_window`.
@@ -249,7 +254,7 @@ places in the schema where an unknown key is not an error — a new key is a new
 vendor (the other is [`models`](#models), where it is a new model). That is
 how OpenAI, DeepSeek, GLM, Groq, OpenRouter, vLLM and Ollama are all supported
 by one adapter. The shipped `openai`, `deepseek` and `glm` profiles are in
-[`lab_harness/llm/catalog.toml`](../lab_harness/llm/catalog.toml).
+[`pyharnx/llm/catalog.toml`](../pyharnx/llm/catalog.toml).
 
 ```toml
 [providers.openai.groq]
@@ -307,8 +312,8 @@ typo there still fails at startup.
 ## Models
 
 `models` describes each model, keyed by id: which provider serves it, its
-limits and capabilities, and what it costs. The ones lab-harness knows ship in
-[`lab_harness/llm/catalog.toml`](../lab_harness/llm/catalog.toml), and a config
+limits and capabilities, and what it costs. The ones pyharnx knows ship in
+[`pyharnx/llm/catalog.toml`](../pyharnx/llm/catalog.toml), and a config
 file adds a model or changes one with the same table:
 
 ```toml
@@ -352,8 +357,8 @@ a local server is one line. Full rationale:
 [providers.md](providers.md#profiles).
 
 ```bash
-lab-harness --model deepseek-flash           # routed by its models entry, no flag
-lab-harness --model their-new-model --provider groq
+pyharnx --model deepseek-flash               # routed by its models entry, no flag
+pyharnx --model their-new-model --provider groq
 ```
 
 ### Prices
@@ -404,7 +409,7 @@ models adds the costs together.
 ## Prompts
 
 What the model is told besides the conversation and the tool declarations. The
-text ships in [`lab_harness/prompts/prompts.toml`](../lab_harness/prompts/prompts.toml) — data,
+text ships in [`pyharnx/prompts/prompts.toml`](../pyharnx/prompts/prompts.toml) — data,
 not Python — and that file is the default of the `[prompts]` section, in the
 same format. A config file replaces a prompt with the same key:
 
@@ -416,7 +421,7 @@ Keep responses concise."""
 ```
 
 Each key is a section of the system prompt.
-[`lab_harness/prompts/system.py`](../lab_harness/prompts/system.py) sends them in
+[`pyharnx/prompts/system.py`](../pyharnx/prompts/system.py) sends them in
 this order, a blank line apart, and leaves out any that is empty — so
 `harness = ""` drops that section, and setting every key to `""` sends no
 system prompt at all:
@@ -527,8 +532,8 @@ Diagnostics about the harness itself — not about the conversation, which is
 what the transcript and `--json` are for.
 
 ```bash
-lab-harness --log-level debug -p "…"     # this run
-LAB_HARNESS_LOG_LEVEL=debug lab-harness  # this shell
+pyharnx --log-level debug -p "…"         # this run
+PYHARNX_LOG_LEVEL=debug pyharnx          # this shell
 ```
 
 ```toml
@@ -538,13 +543,13 @@ level = "warning"
 
 **Everything goes to stderr.** stdout carries the answer in plain-text mode and
 the event stream under `--json`, so a log line on stdout would corrupt a
-pipeline rather than inform one. `lab-harness -p "…" > answer.txt` still captures
+pipeline rather than inform one. `pyharnx -p "…" > answer.txt` still captures
 the answer alone with logging turned all the way up.
 
 The one exception is the interactive terminal when stderr *is* that terminal:
 records are printed through the console, dimmed, above the live region. Written
 to the terminal directly they would land inside the region and break its next
-redraw. Redirect stderr — `lab-harness --log-level debug 2> lab-harness.log` — and they
+redraw. Redirect stderr — `pyharnx --log-level debug 2> pyharnx.log` — and they
 go to the file as usual, out of the conversation.
 
 | Level | What you get |
@@ -572,7 +577,7 @@ opaque API error later.
 **A level set in a config file cannot report that file being read.** Logging is
 configured twice — once from the flag, the environment and the schema defaults
 before `load_config` runs, and again from the loaded config. So to debug config
-resolution itself, use `--log-level` or `LAB_HARNESS_LOG_LEVEL`; `[logging] level`
+resolution itself, use `--log-level` or `PYHARNX_LOG_LEVEL`; `[logging] level`
 takes effect everywhere after loading.
 
 An unusable level name is a startup error, like any other bad config value:
@@ -581,8 +586,8 @@ An unusable level name is a startup error, like any other bad config value:
 error: Unknown log level 'loud'. Available: debug, info, warning, error.
 ```
 
-Only `lab_harness.*` loggers are configured. `--log-level debug` means this
-program, not httpx and the Anthropic SDK as well. Importing `lab_harness` as a
+Only `pyharnx.*` loggers are configured. `--log-level debug` means this
+program, not httpx and the Anthropic SDK as well. Importing `pyharnx` as a
 library installs no handler at all — only the CLI calls `configure_logging`.
 
 **Credential values are never logged.** The provider logs the *name* of the
@@ -637,7 +642,7 @@ rather than "fall through to `AGENTS.md`". That is one rule with no special
 case, and it doubles as the way to opt a project out of an `AGENTS.md` written
 for some other tool.
 
-The file is read from `--cwd`, like config, so `lab-harness --cwd ../other-project`
+The file is read from `--cwd`, like config, so `pyharnx --cwd ../other-project`
 picks up that project's conventions.
 
 **It is capped.** These instructions ride in the system prompt on *every*
@@ -668,7 +673,7 @@ directory_name = "skills"
 max_bytes = 32000
 ```
 
-`directory_name` is read twice: under `.lab-harness` in the working directory,
+`directory_name` is read twice: under `.pyharnx` in the working directory,
 and under home. Both are searched, the working directory's first, and a name
 found there is not replaced by home's — a project overrides a skill of its own
 name rather than shadowing it by accident of ordering.

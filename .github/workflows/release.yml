@@ -1,0 +1,54 @@
+# Publishes to PyPI when a version tag is pushed:
+#
+#     git tag v0.1.0 && git push origin v0.1.0
+#
+# No token is stored anywhere. PyPI trusts this file, run in the `pypi`
+# environment of lxucs/pyharnx, through Trusted Publishing: the publish job
+# trades a short-lived GitHub credential for an upload token. The name of this
+# file, the repository and the environment are what PyPI checks, so renaming
+# any of them means updating the publisher on PyPI first.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    uses: ./.github/workflows/ci.yml
+
+  build:
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+      # A tag that disagrees with pyproject.toml would publish a version
+      # nobody tagged, and PyPI never takes a version back.
+      - name: Tag matches the version
+        run: test "${GITHUB_REF_NAME#v}" = "$(uv version --short)"
+      - run: uv build
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist/
+
+  # Apart from the build, so the credential that can upload exists only in a
+  # job that runs nothing from the repository.
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/pyharnx
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1

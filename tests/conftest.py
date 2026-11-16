@@ -2,7 +2,7 @@
 
 Autouse guards make the suite safe by construction rather than by convention:
 it cannot reach the network, and it cannot read or write the developer's own
-state — the real `~/.lab-harness`, this repository's `.lab-harness/`, or the
+state — the real `~/.pyharnx`, this repository's `.pyharnx/`, or the
 variables their shell exports.
 """
 
@@ -13,8 +13,8 @@ from pathlib import Path
 
 import pytest
 
-from lab_harness.config import SessionConfig
-from lab_harness.logs import ROOT_LOGGER
+from pyharnx.config import SessionConfig
+from pyharnx.logs import ROOT_LOGGER
 
 
 class NetworkBlockedError(AssertionError):
@@ -39,14 +39,14 @@ def _block_network(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture(autouse=True)
-def _isolate_lab_harness_home(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
-    """Point LAB_HARNESS_HOME at a per-test directory.
+def _isolate_pyharnx_home(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
+    """Point PYHARNX_HOME at a per-test directory.
 
     A test that persists a session must not touch the developer's real
-    `~/.lab-harness`. Setting the env var every test makes that impossible rather
+    `~/.pyharnx`. Setting the env var every test makes that impossible rather
     than merely discouraged — `store.home()` reads it first.
     """
-    isolated = tmp_path / "lab-harness-home"
+    isolated = tmp_path / "pyharnx-home"
     monkeypatch.setenv(SessionConfig().home_env, str(isolated))
     return isolated
 
@@ -58,7 +58,7 @@ def _run_in_an_empty_directory(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) 
     Project config, `AGENTS.md` and sessions are found from the working
     directory, and `Agent()` given no config loads one from there. Run from
     the repository root, the suite would read this repository's
-    `.lab-harness/config.local.toml` — a developer's own models and settings —
+    `.pyharnx/config.local.toml` — a developer's own models and settings —
     and pass or fail by what it holds.
     """
     monkeypatch.chdir(tmp_path)
@@ -82,9 +82,9 @@ _CLEARED_VARS = (
     "ZHIPUAI_BASE_URL",
     # Not a credential, but it outranks `agent.model`, so leaving it set would
     # make every default-model assertion depend on the developer's shell.
-    "LAB_HARNESS_MODEL",
+    "PYHARNX_MODEL",
     # Same reasoning: it outranks `logging.level`.
-    "LAB_HARNESS_LOG_LEVEL",
+    "PYHARNX_LOG_LEVEL",
 )
 
 

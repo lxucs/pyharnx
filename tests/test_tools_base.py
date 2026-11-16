@@ -5,9 +5,9 @@ from pathlib import Path
 import pytest
 from pydantic import BaseModel, Field
 
-from lab_harness.llm.types import TextBlock
-from lab_harness.tools.base import ToolContext, ToolResult, ok, tool
-from lab_harness.tools.registry import ToolRegistry
+from pyharnx.llm.types import TextBlock
+from pyharnx.tools.base import ToolContext, ToolResult, ok, tool
+from pyharnx.tools.registry import ToolRegistry
 
 
 class Params(BaseModel):

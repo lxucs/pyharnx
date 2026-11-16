@@ -6,7 +6,7 @@ can be checked by *loading* it rather than by eyeballing it — if it applies
 cleanly and changes nothing, every key exists and every value is the default.
 
 The LLM sections are the exception. Every LLM setting is in
-lab_harness/llm/catalog.toml, whose loader refuses a defaults table that leaves
+pyharnx/llm/catalog.toml, whose loader refuses a defaults table that leaves
 a key out — so the catalog documents each one, and the example none.
 """
 
@@ -17,9 +17,9 @@ from typing import Any
 
 import pytest
 
-from lab_harness.config import Config, _apply
+from pyharnx.config import Config, _apply
 
-EXAMPLE = Path(__file__).resolve().parent.parent / ".lab-harness" / "config.example.toml"
+EXAMPLE = Path(__file__).resolve().parent.parent / ".pyharnx" / "config.example.toml"
 
 #: Sections documented in the catalog, and only there.
 LLM_SECTIONS = frozenset({"providers", "models"})

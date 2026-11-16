@@ -13,8 +13,8 @@ import re
 import pytest
 from rich.console import Console
 
-from lab_harness.agent import Agent
-from lab_harness.agent.types import (
+from pyharnx.agent import Agent
+from pyharnx.agent.types import (
     AgentEnd,
     AgentStart,
     MessageEnd,
@@ -24,10 +24,10 @@ from lab_harness.agent.types import (
     ToolExecutionStart,
     ToolExecutionUpdate,
 )
-from lab_harness.cli.renderers import GLYPH, EventRenderer, display_name, headline
-from lab_harness.config import Config, ConfigError, TerminalConfig, ThemeConfig
-from lab_harness.llm.fake import FAKE_MODEL, FakeProvider, text_response, tool_call_response
-from lab_harness.llm.types import (
+from pyharnx.cli.renderers import GLYPH, EventRenderer, display_name, headline
+from pyharnx.config import Config, ConfigError, TerminalConfig, ThemeConfig
+from pyharnx.llm.fake import FAKE_MODEL, FakeProvider, text_response, tool_call_response
+from pyharnx.llm.types import (
     AssistantMessage,
     TextBlock,
     ThinkingBlock,
@@ -36,8 +36,8 @@ from lab_harness.llm.types import (
     UserMessage,
     text,
 )
-from lab_harness.tools import ToolRegistry
-from lab_harness.tools.fs import FILESYSTEM_TOOLS
+from pyharnx.tools import ToolRegistry
+from pyharnx.tools.fs import FILESYSTEM_TOOLS
 from tests.screen import visible
 
 
@@ -138,7 +138,7 @@ async def test_markdown_mode_renders_the_final_message() -> None:
 
 
 async def test_an_error_message_is_shown() -> None:
-    from lab_harness.llm.fake import error_response
+    from pyharnx.llm.fake import error_response
 
     buffer = io.StringIO()
     await _run(buffer, FakeProvider([error_response("rate limited")]))

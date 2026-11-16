@@ -4,10 +4,12 @@ import os
 import time
 from pathlib import Path
 
-from lab_harness.config import Config, SearchConfig, ToolsConfig
-from lab_harness.llm.types import TextBlock
-from lab_harness.tools.base import ToolContext, ToolResult
-from lab_harness.tools.search import glob, grep
+import pytest
+
+from pyharnx.config import Config, SearchConfig, ToolsConfig
+from pyharnx.llm.types import TextBlock
+from pyharnx.tools.base import ToolContext, ToolResult
+from pyharnx.tools.search import glob, grep
 
 
 def _ctx(tmp_path: Path, config: Config | None = None) -> ToolContext:
@@ -90,6 +92,19 @@ async def test_grep_skips_binary_files(tmp_path: Path) -> None:
     body = _text(result)
     assert "text.txt" in body
     assert "data.bin" not in body
+
+
+async def test_how_much_of_a_file_is_sniffed_for_binary_comes_from_config(tmp_path: Path) -> None:
+    """A NUL past the sniffed prefix goes unseen, so the file is searched."""
+    (tmp_path / "late.bin").write_bytes(b"needle\n" + b"x" * 100 + b"\x00")
+
+    sniffed = await grep.execute({"pattern": "needle"}, _ctx(tmp_path))
+    shallow = await grep.execute(
+        {"pattern": "needle"}, _ctx(tmp_path, _with_search(binary_sniff_bytes=50))
+    )
+
+    assert "late.bin" not in _text(sniffed)
+    assert "late.bin" in _text(shallow)
 
 
 async def test_grep_caps_results_and_says_how_to_page(tmp_path: Path) -> None:
@@ -306,6 +321,107 @@ async def test_glob_reports_a_missing_directory(tmp_path: Path) -> None:
 
     assert result.is_error
     assert "not found" in _text(result).lower()
+
+
+def _scans(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    """Every directory listed from here on, whatever does the walking."""
+    scanned: list[str] = []
+    real = os.scandir
+
+    def scandir(path: str | os.PathLike[str] = ".") -> object:
+        scanned.append(os.fspath(path))
+        return real(path)
+
+    monkeypatch.setattr(os, "scandir", scandir)
+    return scanned
+
+
+async def test_glob_never_descends_into_ignored_directories(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Pruned during the walk, as grep's are: a large `node_modules` costs
+    nothing, rather than being walked in full and then filtered out."""
+    (tmp_path / "node_modules" / "dep").mkdir(parents=True)
+    (tmp_path / "node_modules" / "dep" / "index.js").write_text("")
+    (tmp_path / "app.js").write_text("")
+    scanned = _scans(monkeypatch)
+
+    result = await glob.execute({"pattern": "**/*.js"}, _ctx(tmp_path))
+
+    assert _text(result) == "app.js"
+    assert not [d for d in scanned if "node_modules" in d]
+
+
+async def test_glob_without_a_double_star_lists_one_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / "deep" / "er").mkdir(parents=True)
+    (tmp_path / "deep" / "er" / "x.py").write_text("")
+    (tmp_path / "top.py").write_text("")
+    scanned = _scans(monkeypatch)
+
+    result = await glob.execute({"pattern": "*.py"}, _ctx(tmp_path))
+
+    assert _text(result) == "top.py"
+    assert len(scanned) == 1
+
+
+@pytest.mark.parametrize(
+    "pattern",
+    [
+        "*",
+        "*.py",
+        "**/*",
+        "**/*.py",
+        "src/*.py",
+        "src/**/*.py",
+        "**/test_*.py",
+        "?.md",
+        "[ab].md",
+        "[!a].md",
+        "docs/*/*.md",
+        "src/../*.md",
+        "setup.py",
+    ],
+)
+async def test_glob_matches_what_pathlib_matches(tmp_path: Path, pattern: str) -> None:
+    """The walk is grep's, but the pattern language is still pathlib's."""
+    for name in (
+        "a.md",
+        "b.md",
+        "c.md",
+        "setup.py",
+        ".hidden.py",
+        "src/app.py",
+        "src/pkg/core.py",
+        "src/pkg/test_core.py",
+        "tests/test_app.py",
+        "docs/guide/intro.md",
+    ):
+        (tmp_path / name).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / name).write_text("")
+
+    result = await glob.execute({"pattern": pattern}, _ctx(tmp_path))
+
+    expected = sorted(str(f.relative_to(tmp_path)) for f in tmp_path.glob(pattern) if f.is_file())
+    assert expected, "every case should match something"
+    assert sorted(_text(result).splitlines()) == expected
+
+
+async def test_glob_with_a_trailing_double_star_lists_everything_below(tmp_path: Path) -> None:
+    """pathlib on 3.12 gives directories alone for `src/**`; files are the point."""
+    _tree(tmp_path)
+
+    result = await glob.execute({"pattern": "src/**"}, _ctx(tmp_path))
+
+    assert sorted(_text(result).splitlines()) == ["src/app.py", "src/util.py"]
+
+
+async def test_glob_rejects_an_absolute_pattern(tmp_path: Path) -> None:
+    result = await glob.execute({"pattern": "/etc/*"}, _ctx(tmp_path))
+
+    assert result.is_error
+    assert "relative" in _text(result)
 
 
 # --- shared ---------------------------------------------------------------

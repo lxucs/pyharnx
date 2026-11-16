@@ -1,16 +1,19 @@
-# lab-harness
+# pyharnx
 
-[![CI](https://github.com/lxucs/lab-harness/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/lxucs/lab-harness/actions/workflows/ci.yml)
-[![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue)](pyproject.toml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![CI](https://github.com/lxucs/pyharnx/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/lxucs/pyharnx/actions/workflows/ci.yml)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue)](https://github.com/lxucs/pyharnx/blob/main/pyproject.toml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](https://github.com/lxucs/pyharnx/blob/main/LICENSE)
 
-**A minimal agent harness in Python, built for study and research.** Small
-enough to read in an afternoon, complete enough to run full experiments on.
+pyharnx is **a minimal agent harness built for experiments, and a lightweight 
+Python alternative to [pi](https://github.com/earendil-works/pi)**, short for
+**Py**thon **harn**ess for e**x**periments. Small enough to read in an 
+afternoon, complete enough to run them end to end.
 
-A lightweight Python alternative to [pi](https://github.com/earendil-works/pi),
-with the same layering: `llm/` for pi-ai, `agent/` for pi-agent-core, a pure
-loop wrapped by a stateful `Agent`. A hands-on option for running an agent
-harness locally.
+It keeps pi's layering — `llm/` for pi-ai, `agent/` for pi-agent-core, a pure
+loop wrapped by a stateful `Agent` — in Python, so the harness runs locally in
+the same process as the rest of an experiment: the data, the evaluation, the
+analysis. Where it departs from pi, and why:
+[architecture.md](https://github.com/lxucs/pyharnx/blob/main/docs/architecture.md#relationship-to-pi).
 
 At its core is a local agentic loop: the model reads and writes files, runs
 commands and searches the web, with whichever of those tools you give it. On
@@ -19,58 +22,65 @@ top of it:
 - **An interactive terminal**, to work with the agent directly — thinking and
   tool calls as they stream, a token, cache and cost readout, and sessions that
   resume and export as a web page.
-- **A Python API**, to build on it — `from lab_harness.agent import Agent` is
-  the whole integration. [`search_agent/`](search_agent/) is a complete search
+- **A Python API**, to build on it — `from pyharnx.agent import Agent` is
+  the whole integration. [`search_agent/`](https://github.com/lxucs/pyharnx/tree/main/search_agent) is a complete search
   agent built that way.
+
+<sub>Note: pyharnx was previously named lab-harness; the demo and report below
+show the old name.</sub>
 
 A run in the terminal:
 
-<img src="https://github.com/lxucs/lab-harness/raw/main/img/demo.gif" width="600" alt="lab-harness in the terminal: a question answered from a handful of documents, one tool call at a time">
+<img src="https://github.com/lxucs/pyharnx/raw/main/img/demo.gif" width="600" alt="pyharnx in the terminal: a question answered from a handful of documents, one tool call at a time">
 
-The [trajectory report](https://lxucs.github.io/lab-harness/search_agent/runs/793/report.html) a run records by `/export` in the terminal — the whole agentic trace for easy reading:
+The [trajectory report](https://lxucs.github.io/pyharnx/search_agent/runs/793/report.html) a run records by `/export` in the terminal — the whole agentic trace for easy reading:
 
-<a href="https://lxucs.github.io/lab-harness/search_agent/runs/793/report.html"><img src="https://github.com/lxucs/lab-harness/raw/main/img/report.png" width="600" alt="The trajectory report of a search agent run: turns, requests, tool calls, tokens, cache and cost, then every step"></a>
+<a href="https://lxucs.github.io/pyharnx/search_agent/runs/793/report.html"><img src="https://github.com/lxucs/pyharnx/raw/main/img/report.png" width="600" alt="The trajectory report of a search agent run: turns, requests, tool calls, tokens, cache and cost, then every step"></a>
 
 ## Features
 
-Agent research needs what a product harness rarely gives: the exact request
+An agent experiment needs what a product harness rarely gives: the exact request
 behind every response, and the freedom to swap one piece — a tool, a hook, a
-provider — without forking the rest. lab-harness keeps the core small enough to
+provider — without forking the rest. pyharnx keeps the core small enough to
 hold in your head, with the seams where those changes go.
 
 - **Minimal.** The stateless agent loop is about 500 lines of code, in
-  [`agent/loop.py`](lab_harness/agent/loop.py); the stateful `Agent` that wraps
+  [`agent/loop.py`](https://github.com/lxucs/pyharnx/blob/main/pyharnx/agent/loop.py); the stateful `Agent` that wraps
   it — transcript, subscribers, abort — about 150, in
-  [`agent/agent.py`](lab_harness/agent/agent.py). No other framework dependencies.
+  [`agent/agent.py`](https://github.com/lxucs/pyharnx/blob/main/pyharnx/agent/agent.py). No other framework dependencies.
 - **An agent in a few lines.** `route` a provider, pick tools, build an
   `Agent`, `await agent.prompt(...)`. The run records itself as it goes, so the
-  transcript, the [HTML report](https://lxucs.github.io/lab-harness/search_agent/runs/793/report.html) and the token
+  transcript, the [HTML report](https://lxucs.github.io/pyharnx/search_agent/runs/793/report.html) and the token
   and cost numbers come with it.
 - **Every request reproducible.** A session records the system prompt, tools,
   model, reasoning effort and config each request was sent with.
-  [`trajectories.py --wire`](examples/trajectories.py) exports them as the JSON
-  bodies the endpoint got. See [trajectories](docs/sessions.md#trajectories).
+  [`trajectories.py --wire`](https://github.com/lxucs/pyharnx/blob/main/examples/trajectories.py) exports them as the JSON
+  bodies the endpoint got. See [trajectories](https://github.com/lxucs/pyharnx/blob/main/docs/sessions.md#trajectories).
 - **One loop, many models.** Claude, OpenAI, DeepSeek, GLM, or any other
   OpenAI-compatible endpoint. Every endpoint and model is a table in
-  [`llm/catalog.toml`](lab_harness/llm/catalog.toml), so a new vendor or model
+  [`llm/catalog.toml`](https://github.com/lxucs/pyharnx/blob/main/pyharnx/llm/catalog.toml), so a new vendor or model
   is a few lines of TOML, not code.
 
 ## Architecture
 
-Three layers. Dependencies point strictly downward — `llm/` imports from no
-other layer. (Every layer reads the leaf modules `config.py` and `logs.py`,
-which import only each other.)
+Three layers. Dependencies point strictly downward: each box imports only from
+the boxes below it, and `llm/` from no other layer. (Every layer reads the leaf
+modules `config.py` and `logs.py`, which import only each other.)
 
 ```
-         cli/          terminal, json sink  (subscribers)
+         cli/                 terminal, json sink   (subscribers)
           │
-          ├─────────────────┐
-          ▼                 ▼
-        agent/            prompts/     the system prompt
+          ▼
+       session/               transcripts           (a subscriber too)
           │
-    ┌─────┼─────┐
-    ▼     ▼     ▼
-  llm/  tools/  session/
+          ▼
+        agent/   prompts/     the loop · the system prompt
+          │
+          ▼
+        tools/                built-ins, the registry
+          │
+          ▼
+         llm/                 providers, messages, streaming
 ```
 
 | Layer | Responsibility |
@@ -94,21 +104,32 @@ what lets a frontend in another language be a third subscriber later.
 approval is one, which is why `-p` and interactive modes differ without the
 loop branching. Context compaction will be another.
 
-Details in [docs/architecture.md](docs/architecture.md).
+Details in [docs/architecture.md](https://github.com/lxucs/pyharnx/blob/main/docs/architecture.md).
+
+## Install
+
+```bash
+uv tool install pyharnx      # the pyharnx command, on your PATH
+pip install pyharnx          # or into the current environment
+uv add pyharnx               # or as a dependency of your project
+```
+
+`pyharnx[ddgs]` adds the keyless web search backend. To read and change the
+code as you go, work from a clone instead: `uv sync`, then `uv run pyharnx`.
 
 ## Quick start
 
 ```bash
-export OPENAI_API_KEY=sk-...                          # or api_key in .lab-harness/config.local.toml
+export OPENAI_API_KEY=sk-...                          # or api_key in .pyharnx/config.local.toml
 export TAVILY_API_KEY=tvly-...                        # optional, for web_search
-uv run lab-harness                                    # interactive terminal
-uv run lab-harness -p "summarize the config module"   # one-shot
+pyharnx                                               # interactive terminal
+pyharnx -p "summarize the config module"              # one-shot
 ```
 
-Check [examples/terminal.md](examples/terminal.md) for more details on the interactive terminal.
+Check [examples/terminal.md](https://github.com/lxucs/pyharnx/blob/main/examples/terminal.md) for more details on the interactive terminal.
 
 To keep settings without exporting them each time, put them in
-`~/.lab-harness/config.local.toml` for every project. It merges over the
+`~/.pyharnx/config.local.toml` for every project. It merges over the
 defaults, so it holds only the keys you change:
 
 ```toml
@@ -123,7 +144,7 @@ api_key = "tvly-..."
 ```
 
 Every key, and the order the layers apply in:
-[docs/configuration.md](docs/configuration.md).
+[docs/configuration.md](https://github.com/lxucs/pyharnx/blob/main/docs/configuration.md).
 
 ## From Python
 
@@ -133,68 +154,68 @@ directly:
 ```python
 import asyncio
 
-from lab_harness.agent import Agent
-from lab_harness.config import load_config
-from lab_harness.llm.providers import route
-from lab_harness.tools import default_registry
+from pyharnx.agent import Agent
+from pyharnx.config import load_config
+from pyharnx.llm.providers import route
+from pyharnx.tools import default_registry
 
 config = load_config()
-model, provider = route(None, config)  # $LAB_HARNESS_MODEL, else agent.model
+model, provider = route(None, config)  # $PYHARNX_MODEL, else agent.model
 tools = default_registry().select(["read", "ls", "grep", "glob"])
 agent = Agent(model=model, provider=provider, tools=tools, config=config)
 messages = asyncio.run(agent.prompt("What does this project do?"))
 ```
 
-That agent has no system prompt. `build_system_prompt` from `lab_harness.prompts`
-builds the one the CLI sends, as [quickstart.py](examples/quickstart.py) shows;
-see the `[prompts]` sections in [prompts.toml](lab_harness/prompts/prompts.toml).
+That agent has no system prompt. `build_system_prompt` from `pyharnx.prompts`
+builds the one the CLI sends, as [quickstart.py](https://github.com/lxucs/pyharnx/blob/main/examples/quickstart.py) shows;
+see the `[prompts]` sections in [prompts.toml](https://github.com/lxucs/pyharnx/blob/main/pyharnx/prompts/prompts.toml).
 
-[examples/](examples/) goes further: streaming events, a custom tool, all four
+[examples/](https://github.com/lxucs/pyharnx/tree/main/examples) goes further: streaming events, a custom tool, all four
 hooks, a scripted model that needs no key, and exporting a session's requests
 for training. Configuration and every environment variable:
-[docs/configuration.md](docs/configuration.md).
+[docs/configuration.md](https://github.com/lxucs/pyharnx/blob/main/docs/configuration.md).
 
-## Example: a search agent built on lab-harness
+## Example: a search agent built on pyharnx
 
-[`search_agent/`](search_agent/) is a search agent — an agent that answers a
+[`search_agent/`](https://github.com/lxucs/pyharnx/tree/main/search_agent) is a search agent — an agent that answers a
 question by searching and reading documents — running as a program you can start
 with one command. The agent itself is a few lines:
 
 ```python
 model, provider = route(None, config)  # the model, from config alone
-tools = tools_for(("ls", "glob", "grep", "read", "search_docs"))
+tools = tools_for(settings.tools, settings.corpus)  # built-ins plus search_docs
 agent = Agent(
     model=model,
     provider=provider,
     tools=tools,
     config=config,
-    system_prompt=SYSTEM_PROMPT,
-    cwd=".",
+    system_prompt=SYSTEM_PROMPT.format(corpus=settings.corpus),
+    cwd=str(settings.cwd),
 )
 messages = await agent.prompt(question)
 ```
 
 `uv run python -m search_agent` runs it, and a real run is committed to look
-at: [the report it produced](https://lxucs.github.io/lab-harness/search_agent/runs/793/report.html), with the
+at: [the report it produced](https://lxucs.github.io/pyharnx/search_agent/runs/793/report.html), with the
 trajectory as JSON beside it.
 
 ## Documentation
 
 | Page | Covers |
 |---|---|
-| [examples/](examples/) | Runnable usage, from the terminal and from Python |
-| [search_agent/](search_agent/) | A search agent: a whole program in Python, and a committed run to read |
-| [architecture.md](docs/architecture.md) | Layering, module boundaries, deviations from pi |
-| [events.md](docs/events.md) | The event protocol between runtime and frontend |
-| [providers.md](docs/providers.md) | Provider contract, profiles, adding a vendor |
-| [tools.md](docs/tools.md) | Tool contract, built-ins, adding a tool |
-| [sessions.md](docs/sessions.md) | Transcript format, resume, rebuilding trajectories |
-| [cli.md](docs/cli.md) | Terminal, flags, keybindings, the usage and cost readout |
-| [configuration.md](docs/configuration.md) | Config files, environment variables, models and prices, prompts |
-| [contributing.md](docs/contributing.md) | Code conventions, architectural invariants, config rules |
+| [examples/](https://github.com/lxucs/pyharnx/tree/main/examples) | Runnable usage, from the terminal and from Python |
+| [search_agent/](https://github.com/lxucs/pyharnx/tree/main/search_agent) | A search agent: a whole program in Python, and a committed run to read |
+| [architecture.md](https://github.com/lxucs/pyharnx/blob/main/docs/architecture.md) | Layering, module boundaries, deviations from pi |
+| [events.md](https://github.com/lxucs/pyharnx/blob/main/docs/events.md) | The event protocol between runtime and frontend |
+| [providers.md](https://github.com/lxucs/pyharnx/blob/main/docs/providers.md) | Provider contract, profiles, adding a vendor |
+| [tools.md](https://github.com/lxucs/pyharnx/blob/main/docs/tools.md) | Tool contract, built-ins, adding a tool |
+| [sessions.md](https://github.com/lxucs/pyharnx/blob/main/docs/sessions.md) | Transcript format, resume, rebuilding trajectories |
+| [cli.md](https://github.com/lxucs/pyharnx/blob/main/docs/cli.md) | Terminal, flags, keybindings, the usage and cost readout |
+| [configuration.md](https://github.com/lxucs/pyharnx/blob/main/docs/configuration.md) | Config files, environment variables, models and prices, prompts |
+| [contributing.md](https://github.com/lxucs/pyharnx/blob/main/docs/contributing.md) | Code conventions, architectural invariants, config rules |
 
-Contributing: [docs/contributing.md](docs/contributing.md). AI coding agents
-should also read [AGENTS.md](AGENTS.md).
+Contributing: [docs/contributing.md](https://github.com/lxucs/pyharnx/blob/main/docs/contributing.md). AI coding agents
+should also read [AGENTS.md](https://github.com/lxucs/pyharnx/blob/main/AGENTS.md).
 
 ## Roadmap
 
@@ -205,13 +226,13 @@ should also read [AGENTS.md](AGENTS.md).
 
 Not planned: MCP, sub-agents, plan mode, an RPC control channel,
 extensions-as-plugins, sandboxing, provider-native `web_search`. What each item
-needs, and why those are left out: [docs/README.md](docs/README.md#todo).
+needs, and why those are left out: [docs/README.md](https://github.com/lxucs/pyharnx/blob/main/docs/README.md#todo).
 
 ## Citation
 
-If lab-harness helps your research, GitHub's **Cite this repository** button
-gives a citation in APA or BibTeX, from [CITATION.cff](CITATION.cff).
+If pyharnx helps your research, GitHub's **Cite this repository** button
+gives a citation in APA or BibTeX, from [CITATION.cff](https://github.com/lxucs/pyharnx/blob/main/CITATION.cff).
 
 ## License
 
-[MIT](LICENSE).
+[MIT](https://github.com/lxucs/pyharnx/blob/main/LICENSE).

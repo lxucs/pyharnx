@@ -15,7 +15,7 @@ keeps the shipped number itself covered.
 from dataclasses import replace
 from typing import Any
 
-from lab_harness.config import ModelConfig, OpenAIConfig, model_defaults, profile_defaults
+from pyharnx.config import ModelConfig, OpenAIConfig, model_defaults, profile_defaults
 
 
 def profile_entry(**settings: Any) -> OpenAIConfig:

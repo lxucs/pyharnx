@@ -2,7 +2,7 @@ import asyncio
 
 import pytest
 
-from lab_harness.llm.events import (
+from pyharnx.llm.events import (
     StreamDone,
     StreamError,
     StreamEvent,
@@ -10,15 +10,15 @@ from lab_harness.llm.events import (
     TextDelta,
     ToolCallEnd,
 )
-from lab_harness.llm.fake import (
+from pyharnx.llm.fake import (
     FAKE_MODEL,
     FakeProvider,
     error_response,
     text_response,
     tool_call_response,
 )
-from lab_harness.llm.provider import StreamOptions
-from lab_harness.llm.types import Context, TextBlock, ToolCallBlock
+from pyharnx.llm.provider import StreamOptions
+from pyharnx.llm.types import Context, TextBlock, ToolCallBlock
 
 
 async def _drain(provider: FakeProvider, ctx: Context) -> list[StreamEvent]:

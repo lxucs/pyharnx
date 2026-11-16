@@ -13,8 +13,7 @@ agreements for AI coding agents — environment, testing, git — are in
 - `ruff check` and `ruff format` before calling work done.
 - Match the comment density of surrounding code. Comment *why*, not *what*.
 - Prefer small, focused modules. Past ~400 lines *of code* a file is usually
-  doing two things. Comments and docstrings do not count against that — several
-  modules here run past 500 total lines and are still under the limit.
+  doing two things. Comments and docstrings do not count against that.
 
 ## The invariants
 
@@ -24,15 +23,15 @@ boundary, which is why the rest of the code has so few defensive checks.
 ### 1. Dependencies point downward
 
 ```
-cli/  →  agent/  →  llm/
-         tools/      (llm has no upward deps)
-         session/
-cli/  →  prompts/    (agent/ is handed the finished system prompt)
+cli/  →  session/  →  agent/  →  tools/  →  llm/    (llm has no upward deps)
+cli/  →  prompts/     (agent/ is handed the finished system prompt)
 ```
 
-`cli/` is a subscriber; the runtime never imports from it. Deleting `cli/` must
-leave the runtime working. If you need an upward import, the abstraction is in
-the wrong place — add a hook or inject the dependency.
+A package imports only from those to its right — `cli/` from any of them.
+`cli/` and `session/` are subscribers; the runtime never imports from either.
+Deleting `cli/` must leave the runtime working. If you need an upward import,
+the abstraction is in the wrong place — add a hook or inject the dependency.
+`tests/test_layering.py` enforces it, from every import in the source.
 
 See [architecture.md](architecture.md).
 
@@ -76,12 +75,12 @@ if len(output) > config.tools.bash.max_output_bytes:
     output = output[: config.tools.bash.max_output_bytes]
 ```
 
-Defaults live in one place — the schema in `lab_harness/config.py` — so reading the
+Defaults live in one place — the schema in `pyharnx/config.py` — so reading the
 schema tells you every knob the system has. Adding a tunable means adding it to
 the schema with a default in the same change.
 
 LLM settings are the exception: they are data, all in
-`lab_harness/llm/catalog.toml`, in the same format a config file uses —
+`pyharnx/llm/catalog.toml`, in the same format a config file uses —
 Claude's adapter settings, every OpenAI-family endpoint, every model, and the
 `[defaults]` an endpoint or a model gets for a key it leaves out. Their classes
 in `config.py` have types and no defaults, so a new LLM setting is a field
@@ -90,7 +89,7 @@ there and its value in the catalog, in the same change. Adding a model is one
 
 Prompts are data too. Text the model is sent — each section of the system
 prompt, the wrapper around project instructions — lives in
-`lab_harness/prompts/prompts.toml` and reaches code as `config.prompts`, never
+`pyharnx/prompts/prompts.toml` and reaches code as `config.prompts`, never
 as a string literal in Python; `prompts/system.py` beside it fills it in and
 joins it. The system prompt names no tools: tool guidance belongs in the tool's own
 description, which is only sent when the tool is. The one exception is text
@@ -112,8 +111,8 @@ the prompts, docs, tests, or examples.
 | `config.toml` | yes | Non-sensitive defaults |
 | `config.local.toml` | **no** — gitignored | Keys, absolute paths, private endpoints |
 | `config.example.toml` | yes | Template with placeholders |
-| `lab_harness/llm/catalog.toml` | yes | Every LLM setting — public, documented vendor data only |
-| `lab_harness/prompts/prompts.toml` | yes | Shipped prompts — no tool names, nothing about a particular machine |
+| `pyharnx/llm/catalog.toml` | yes | Every LLM setting — public, documented vendor data only |
+| `pyharnx/prompts/prompts.toml` | yes | Shipped prompts — no tool names, nothing about a particular machine |
 
 Prefer environment variables for secrets. If you add a config location, add its
 local variant to `.gitignore` in the same change.
@@ -172,7 +171,7 @@ _log = logging.getLogger(__name__)
 ```
 
 Name it `_log`, and never call `basicConfig` or add a handler — only `cli/`
-configures logging, through `lab_harness/logs.py`. A library that configures
+configures logging, through `pyharnx/logs.py`. A library that configures
 logging hijacks the application embedding it.
 
 Pick the level by who needs the line:
@@ -227,7 +226,7 @@ updated is not finished.
 | Layering or module change | [architecture.md](architecture.md) |
 | Transcript format change | [sessions.md](sessions.md) |
 | New config key, env var, or log level | [configuration.md](configuration.md) |
-| New prompt, or a change to the default one | `lab_harness/prompts/prompts.toml` documents itself; a new section is also a field of `PromptsConfig`, a place in `prompts/system.py`'s order, and a row in [configuration.md](configuration.md#prompts) |
+| New prompt, or a change to the default one | `pyharnx/prompts/prompts.toml` documents itself; a new section is also a field of `PromptsConfig`, a place in `prompts/system.py`'s order, and a row in [configuration.md](configuration.md#prompts) |
 
 Keep the Status section of [README.md](README.md#status) honest when something
 lands or is abandoned, and the Roadmap in [`../README.md`](../README.md#roadmap)
@@ -242,3 +241,18 @@ uv run pytest
 ```
 
 Run them and read the output before claiming work is done.
+
+## Releasing
+
+A release is a version tag; `.github/workflows/release.yml` does the rest. It
+runs the checks above, refuses a tag that disagrees with `pyproject.toml`,
+builds, and publishes to PyPI through Trusted Publishing — no token is stored
+anywhere.
+
+```bash
+uv version --bump patch            # or minor; edits pyproject.toml and uv.lock
+# set `version` in CITATION.cff to match, then commit
+git tag v$(uv version --short) && git push origin v$(uv version --short)
+```
+
+PyPI never takes a version back, so a broken release is fixed by the next one.

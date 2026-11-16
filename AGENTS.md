@@ -9,10 +9,11 @@ configuration hygiene, testing, and git.
 
 ## What this project is
 
-A minimal agent harness in Python, built for research. Terminal frontend,
-modeled on [pi](https://github.com/earendil-works/pi). Researchers read and
-change the code, so keep it small and readable: a new feature that fits a hook
-or a subscriber does not belong in the loop.
+A minimal agent harness in Python, built for experiments — a lightweight
+alternative to [pi](https://github.com/earendil-works/pi), with a terminal
+frontend modeled on it. The people running those experiments read and change
+the code, so keep it small and readable: a new feature that fits a hook or a
+subscriber does not belong in the loop.
 
 - Architecture: [`docs/architecture.md`](docs/architecture.md)
 - Usage, terminal and Python: [`examples/`](examples/)
@@ -29,7 +30,7 @@ root, created and managed by `uv sync`. There is no named or global environment
 uv sync                 # create/update .venv from pyproject.toml + uv.lock
 uv sync --extra ddgs    # ...plus the optional keyless search backend
 uv run pytest           # run tests
-uv run lab-harness      # run the CLI
+uv run pyharnx          # run the CLI
 uv add <package>        # add a dependency
 ```
 
@@ -47,12 +48,12 @@ ids — in config, the model catalog, the prompts, docs, tests, or examples.
 
 | File | Committed | Holds |
 |---|---|---|
-| `.lab-harness/config.toml` | yes | Non-sensitive defaults |
-| `.lab-harness/config.local.toml` | **no** — gitignored | Keys, absolute paths, private endpoints |
-| `~/.lab-harness/config.local.toml` | **no** — outside the repo | The same, for every project |
-| `.lab-harness/config.example.toml` | yes | Template, placeholders only |
-| `lab_harness/llm/catalog.toml` | yes | Every LLM setting — public, documented vendor data only |
-| `lab_harness/prompts/prompts.toml` | yes | Shipped prompts — no tool names, nothing about a particular machine |
+| `.pyharnx/config.toml` | yes | Non-sensitive defaults |
+| `.pyharnx/config.local.toml` | **no** — gitignored | Keys, absolute paths, private endpoints |
+| `~/.pyharnx/config.local.toml` | **no** — outside the repo | The same, for every project |
+| `.pyharnx/config.example.toml` | yes | Template, placeholders only |
+| `pyharnx/llm/catalog.toml` | yes | Every LLM setting — public, documented vendor data only |
+| `pyharnx/prompts/prompts.toml` | yes | Shipped prompts — no tool names, nothing about a particular machine |
 
 Real runtime values belong in the `*.local.toml` layer, which `.gitignore`
 excludes; it merges over the committed file, so it only needs the keys that
@@ -73,14 +74,14 @@ configuration conventions, are in
 
 **The automated suite must never touch the network.** This is enforced:
 `tests/conftest.py` installs autouse fixtures that block outbound socket
-connections, redirect `LAB_HARNESS_HOME` to a temp directory, start each test
+connections, redirect `PYHARNX_HOME` to a temp directory, start each test
 in an empty working directory, and unset every credential variable — so a test
 reaching a real API fails loudly rather than going flaky, and a developer with
-a key exported or a `.lab-harness/config.local.toml` in this repository gets the
+a key exported or a `.pyharnx/config.local.toml` in this repository gets the
 same results as CI, which has neither.
 
 - Loop and agent tests get their model responses from
-  `lab_harness.llm.fake.FakeProvider`, fed scripted stream events. Never call a
+  `pyharnx.llm.fake.FakeProvider`, fed scripted stream events. Never call a
   real provider.
 - The HTTP provider adapters (`chat_completions.py`, `responses.py`) and the web
   tools are tested through `httpx.MockTransport`, which exercises the real

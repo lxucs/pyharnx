@@ -5,27 +5,27 @@ Prepare, once:
     brew install vhs gifsicle   # vhs brings ttyd and ffmpeg; on other systems see
                                 # https://github.com/charmbracelet/vhs#installation
 
-and a model with its key where `uv run lab-harness` finds them from the
-repository root — `.lab-harness/config.local.toml`, `~/.lab-harness/`, or the
+and a model with its key where `uv run pyharnx` finds them from the
+repository root — `.pyharnx/config.local.toml`, `~/.pyharnx/`, or the
 environment. Then, from the repository root:
 
     uv run python img/record.py              # record, then shrink with gifsicle
     uv run python img/record.py --speed 3    # play it back faster still
     uv run python img/record.py --dry-run    # print the vhs tape, record nothing
 
-vhs drives a real terminal: it starts `lab-harness`, types a question that takes
+vhs drives a real terminal: it starts `pyharnx`, types a question that takes
 three documents to answer, waits for the run to end, shows `/status`, and writes
 the GIF. The model is a live one, so each take costs a run and comes out
 different — watch it before committing it.
 
-The session runs in a scratch directory, `~/lab-harness-recording`, so the
+The session runs in a scratch directory, `~/pyharnx-recording`, so the
 startup box shows that rather than this checkout's path. It holds the three
-documents and a copy of `.lab-harness/config.local.toml`, for the same model and
+documents and a copy of `.pyharnx/config.local.toml`, for the same model and
 keys, and is deleted afterwards, keys and all.
 
 vhs shows nothing while it records. The session is saved like any other, so
 progress is in the newest transcript under
-`~/.lab-harness/sessions/lab-harness-recording-*/`.
+`~/.pyharnx/sessions/pyharnx-recording-*/`.
 """
 
 import argparse
@@ -38,7 +38,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 OUTPUT = "img/demo.gif"
 #: Where the session runs. Under home, so the startup box shows it as `~/...`.
-SCRATCH = Path.home() / "lab-harness-recording"
+SCRATCH = Path.home() / "pyharnx-recording"
 
 #: What is typed in, line breaks and all, as one message.
 REQUEST = """\
@@ -106,7 +106,7 @@ def tape(speed: float) -> str:
         "Enter",
         "Sleep 500ms",
         "Show",
-        f'Type "uv run lab-harness --tools {TOOLS} --reasoning-effort {EFFORT}"',
+        f'Type "uv run pyharnx --tools {TOOLS} --reasoning-effort {EFFORT}"',
         "Sleep 400ms",
         "Enter",
         # The startup box: nothing has scrolled yet, so the screen check holds.
@@ -143,10 +143,10 @@ def stage() -> None:
     docs.mkdir(parents=True)
     for docid in DOCIDS:
         shutil.copyfile(CORPUS / f"{docid}.md", docs / f"{docid}.md")
-    local = REPO / ".lab-harness" / "config.local.toml"
+    local = REPO / ".pyharnx" / "config.local.toml"
     if local.is_file():
-        (SCRATCH / ".lab-harness").mkdir()
-        shutil.copyfile(local, SCRATCH / ".lab-harness" / "config.local.toml")
+        (SCRATCH / ".pyharnx").mkdir()
+        shutil.copyfile(local, SCRATCH / ".pyharnx" / "config.local.toml")
 
 
 def shrink(path: Path) -> None:

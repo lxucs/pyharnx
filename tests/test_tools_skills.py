@@ -1,6 +1,6 @@
 """Skills: discovery, frontmatter, and the tool that loads one.
 
-Nothing here reads a real home: the autouse fixture points `LAB_HARNESS_HOME`
+Nothing here reads a real home: the autouse fixture points `PYHARNX_HOME`
 at a directory under `tmp_path`, which is also the working directory.
 """
 
@@ -9,10 +9,10 @@ from pathlib import Path
 
 import pytest
 
-from lab_harness.config import Config, ConfigError, SkillsConfig
-from lab_harness.llm.types import TextBlock
-from lab_harness.tools.base import ToolContext, ToolResult
-from lab_harness.tools.skills import directories, index, load_skills, skill
+from pyharnx.config import Config, ConfigError, SkillsConfig
+from pyharnx.llm.types import TextBlock
+from pyharnx.tools.base import ToolContext, ToolResult
+from pyharnx.tools.skills import directories, index, load_skills, skill
 
 
 def _write(root: Path, name: str, text: str) -> Path:
@@ -29,12 +29,12 @@ def _skill(name: str = "commit", description: str = "Write a commit message", bo
 
 def _project(tmp_path: Path) -> Path:
     """The working directory's own skills directory."""
-    return tmp_path / ".lab-harness" / "skills"
+    return tmp_path / ".pyharnx" / "skills"
 
 
 def _home(tmp_path: Path) -> Path:
     """Home's, which the fixture puts under tmp_path."""
-    return tmp_path / "lab-harness-home" / "skills"
+    return tmp_path / "pyharnx-home" / "skills"
 
 
 def _ctx(tmp_path: Path, config: Config | None = None) -> ToolContext:
@@ -229,7 +229,7 @@ async def test_the_tool_names_the_other_files_beside_them(tmp_path: Path) -> Non
 
     result = await skill.execute({"name": "commit"}, _ctx(tmp_path))
 
-    assert "- .lab-harness/skills/commit/guide.md" in _text(result)
+    assert "- .pyharnx/skills/commit/guide.md" in _text(result)
 
 
 async def test_the_tool_hands_the_allowed_tools_to_the_gate(tmp_path: Path) -> None:
@@ -259,7 +259,7 @@ async def test_an_unknown_name_with_no_skills_says_so(tmp_path: Path) -> None:
 async def test_the_tool_reads_from_the_calls_own_working_directory(tmp_path: Path) -> None:
     """The rule every tool follows: cwd, never the process's."""
     elsewhere = tmp_path / "elsewhere"
-    _write(elsewhere / ".lab-harness" / "skills", "commit", _skill())
+    _write(elsewhere / ".pyharnx" / "skills", "commit", _skill())
 
     assert not (await skill.execute({"name": "commit"}, _ctx(elsewhere))).is_error
     assert (await skill.execute({"name": "commit"}, _ctx(tmp_path))).is_error

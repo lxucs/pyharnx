@@ -12,15 +12,15 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
-from lab_harness.agent import Agent
-from lab_harness.agent.agent import Listener
-from lab_harness.agent.types import declarations_for
-from lab_harness.cli.export import export_html
-from lab_harness.cli.usage import UsageSummary, cache_hit_rate, prompt_tokens, summarize
-from lab_harness.config import Config
-from lab_harness.llm.providers import route
-from lab_harness.llm.serde import to_dict
-from lab_harness.llm.types import (
+from pyharnx.agent import Agent
+from pyharnx.agent.agent import Listener
+from pyharnx.agent.types import declarations_for
+from pyharnx.cli.export import export_html
+from pyharnx.cli.usage import UsageSummary, cache_hit_rate, prompt_tokens, summarize
+from pyharnx.config import Config
+from pyharnx.llm.providers import route
+from pyharnx.llm.serde import to_dict
+from pyharnx.llm.types import (
     AssistantMessage,
     Message,
     TextBlock,
@@ -28,8 +28,8 @@ from lab_harness.llm.types import (
     UserMessage,
     text,
 )
-from lab_harness.session import start_recorder
-from lab_harness.tools import AgentTool, ToolRegistry, default_registry
+from pyharnx.session import start_recorder
+from pyharnx.tools import AgentTool, ToolRegistry, default_registry
 from search_agent.settings import Settings
 from search_agent.tools import SEARCH_NAME, corpus_search
 

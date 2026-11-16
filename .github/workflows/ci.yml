@@ -1,12 +1,14 @@
 # The checks AGENTS.md asks for before work is called done, on every push to
-# main and every pull request. The suite is offline by construction, so this
-# needs no secrets.
+# main and every pull request — and before every release, which calls this
+# workflow rather than repeating it. The suite is offline by construction, so
+# this needs no secrets.
 name: CI
 
 on:
   push:
     branches: [main]
   pull_request:
+  workflow_call:
 
 permissions:
   contents: read

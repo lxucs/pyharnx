@@ -16,10 +16,10 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
-from lab_harness.agent import Agent, AgentEvent
-from lab_harness.config import load_config
-from lab_harness.llm.providers import route
-from lab_harness.tools import (
+from pyharnx.agent import Agent, AgentEvent
+from pyharnx.config import load_config
+from pyharnx.llm.providers import route
+from pyharnx.tools import (
     ToolContext,
     ToolRegistry,
     ToolResult,

@@ -3,13 +3,13 @@
 import io
 import json
 
-from lab_harness.agent import Agent
-from lab_harness.agent.types import AgentEvent
-from lab_harness.cli.json_sink import json_sink
-from lab_harness.llm.fake import FAKE_MODEL, FakeProvider, text_response, tool_call_response
-from lab_harness.llm.types import ToolCallBlock
-from lab_harness.tools import ToolRegistry
-from lab_harness.tools.fs import FILESYSTEM_TOOLS
+from pyharnx.agent import Agent
+from pyharnx.agent.types import AgentEvent
+from pyharnx.cli.json_sink import json_sink
+from pyharnx.llm.fake import FAKE_MODEL, FakeProvider, text_response, tool_call_response
+from pyharnx.llm.types import ToolCallBlock
+from pyharnx.tools import ToolRegistry
+from pyharnx.tools.fs import FILESYSTEM_TOOLS
 
 
 def _lines(stream: io.StringIO) -> list[dict[str, object]]:
@@ -57,7 +57,7 @@ async def test_the_stream_is_valid_json_throughout_a_tool_run(tmp_path) -> None:
 
 async def test_sink_output_survives_a_round_trip_back_into_events() -> None:
     """Serialized events must be re-readable — that is what a second consumer does."""
-    from lab_harness.llm.serde import message_from_dict
+    from pyharnx.llm.serde import message_from_dict
 
     stream = io.StringIO()
     agent = Agent(model=FAKE_MODEL, provider=FakeProvider([text_response("hello")]))

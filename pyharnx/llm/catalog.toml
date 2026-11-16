@@ -1,0 +1,373 @@
+# Every LLM setting pyharnx ships: Claude's adapter, the OpenAI-family
+# endpoints, the models, and what an endpoint or a model gets for a key it
+# leaves out.
+#
+# This file is the default of two config sections, [providers] and [models],
+# and uses their format exactly. A config file adds a vendor or a model with
+# the same tables, and a table with a name used here overrides only the keys it
+# gives: `[models.claude-sonnet-5.price] input = 2.5` keeps the other rates.
+# Every key is checked as strictly as in any config file.
+#
+# [defaults] is this file's alone — a config file overrides one entry at a
+# time, never every one. The defaults tables and [providers.anthropic] set
+# every key, as nothing else supplies one they leave out, so between them they
+# list every key there is. What each means is in `AnthropicConfig`,
+# `OpenAIConfig` and `ModelConfig`, in pyharnx/config.py.
+#
+# Public, documented vendor data only. Keys and private endpoints belong in the
+# environment or a gitignored config.local.toml, never here.
+
+
+# --- Claude -----------------------------------------------------------------
+#
+# Claude has an adapter of its own rather than an endpoint profile.
+
+[providers.anthropic]
+# Names of the environment variables credentials are read from, the token
+# first. The values themselves are never written here. There is no base_url
+# key: a gateway in front of the endpoint is the variable base_url_env names.
+auth_token_env = "ANTHROPIC_AUTH_TOKEN"
+api_key_env = "ANTHROPIC_API_KEY"
+base_url_env = "ANTHROPIC_BASE_URL"
+# Sampling ceiling when the model declares none.
+default_max_tokens = 8_192
+# Extra attempts for a retryable failure. The SDK owns the schedule — it backs
+# off exponentially with jitter and honors Retry-After — so only the count is
+# set here, matching max_retries on the endpoint profiles below.
+max_retries = 5
+# What comes back in a thinking block: "summarized" or "omitted". The 5-series
+# models think whether asked or not, but default to omitted — empty blocks, so
+# nothing to show. Billing is the same either way. "" sends no preference.
+thinking_display = "summarized"
+# Models that take the older thinking request, a token budget, by id prefix:
+# everything before 4.6. Every other reasoning model gets adaptive thinking,
+# which the 5-series requires — it rejects a budget with a 400.
+budget_thinking_models = [
+    "claude-haiku-4-5", "claude-sonnet-4-5", "claude-opus-4-5", "claude-opus-4-1",
+    "claude-opus-4-0", "claude-opus-4-2025", "claude-sonnet-4-0",
+    "claude-sonnet-4-2025", "claude-3",
+]
+# Budget for those models, in tokens, when a reasoning effort is set — any
+# level. They do not think otherwise.
+thinking_budget_tokens = 4_096
+
+
+# --- endpoints --------------------------------------------------------------
+#
+# One table per vendor speaking an OpenAI-family protocol, keyed by profile
+# name. A config file adds one with a new [providers.openai.<name>], plus a
+# [models] entry per model it serves:
+#
+#   [providers.openai.groq]
+#   base_url = "https://api.groq.com/openai/v1"
+#   api_key_env = "GROQ_API_KEY"
+#
+#   [models."llama-3.3-70b-versatile"]   # quoted: a bare key cannot hold a dot
+#   provider = "groq"
+#
+# A key is never written in a committed file: set the variable api_key_env
+# names, or put api_key in config.local.toml.
+
+[defaults.profile]
+# What a profile gets for each key it leaves out.
+#
+# The protocol:
+#   "responses"         OpenAI's current API. Carries a reasoning model's
+#                       chain of thought across a tool call (encrypted).
+#   "chat_completions"  What everyone else speaks — DeepSeek, GLM, Groq,
+#                       OpenRouter, vLLM, Ollama.
+api = "chat_completions"
+# OpenAI's endpoint and variables, so the openai profile names only its
+# protocol. A profile for any other vendor names its own.
+base_url = "https://api.openai.com/v1"
+api_key_env = "OPENAI_API_KEY"
+# Overrides base_url when set.
+base_url_env = "OPENAI_BASE_URL"
+# Sampling ceiling when the model declares none.
+default_max_tokens = 8_192
+# Wall-clock limit for one streamed request, in seconds.
+timeout_seconds = 120.0
+# Extra attempts for a request that failed in a way another one could fix: a
+# timeout, rate limiting, a 5xx, a dropped connection. Any other status is the
+# request's own fault and is not sent again. 0 sends each request once. A reply
+# already being delivered is never retried — see docs/providers.md.
+max_retries = 5
+# Wait before the first retry, doubling for each one after: 1, 2, 4, 8, 16.
+retry_initial_seconds = 1.0
+# Ceiling on one wait, which a Retry-After from the server is honored up to.
+retry_max_seconds = 60.0
+# chat_completions only: ask for token counts in the stream. Turn off for a
+# server that rejects stream_options — some implementations do.
+include_usage = true
+# chat_completions only: stream the reply token by token. Turn off for an
+# endpoint that has to see a whole exchange to record it — an RL training
+# gateway refuses a streaming request. The reply reaches the loop as the same
+# events either way, a block's text arriving in one delta rather than many.
+stream = true
+# chat_completions only: field each earlier turn's reasoning is sent back in;
+# empty sends none. A vendor that wants it may refuse a tool loop without it,
+# and one that never asked may refuse the field — so none, unless the vendor
+# documents it.
+replay_reasoning_field = ""
+# chat_completions only: ask the server to keep earlier reasoning in context.
+# GLM's Preserved Thinking — it sends GLM's own request shape, so leave it off
+# for any other vendor. Also switches thinking on for GLM-4.6, which is hybrid.
+preserve_thinking = false
+# responses only: detail of the reasoning summary ("auto", "concise",
+# "detailed"). Empty asks for none, which makes thinking invisible — the raw
+# chain is never returned, so the summary is the only readable form.
+reasoning_summary = "auto"
+# responses only: let the server keep the conversation and refer to it by id.
+# Off, because this harness owns its transcript. Turning it on disables
+# encrypted-reasoning replay.
+store = false
+
+[providers.openai.openai]
+api = "responses"
+
+[providers.openai.deepseek]
+base_url = "https://api.deepseek.com/v1"
+api_key_env = "DEEPSEEK_API_KEY"
+# api_key = "sk-..."   # or the literal key, here in config.local.toml; the env var above wins if set
+base_url_env = "DEEPSEEK_BASE_URL"
+# DeepSeek returns a 400 for a tool loop without its earlier reasoning.
+replay_reasoning_field = "reasoning_content"
+
+[providers.openai.glm]
+# The mainland endpoint. The international one is https://api.z.ai/api/paas/v4
+# — override base_url to use it.
+base_url = "https://open.bigmodel.cn/api/paas/v4"
+api_key_env = "ZHIPUAI_API_KEY"
+base_url_env = "ZHIPUAI_BASE_URL"
+# GLM asks for its reasoning back unmodified, and discards it server-side
+# unless asked to keep it.
+replay_reasoning_field = "reasoning_content"
+preserve_thinking = true
+
+
+# --- models -----------------------------------------------------------------
+#
+# One table per model id. A config file adds one with a new [models.<id>], or
+# changes a shipped one by naming it.
+#
+# Limits are the vendor's documented figures, never guesses above them: a
+# window that is understated costs a little context, one that is overstated
+# fails the request. The capability flags are what the runtime acts on —
+# `supports_reasoning` decides the thinking request an adapter sends.
+#
+# Prices change: override them rather than trusting these.
+
+[defaults.model]
+# What a model gets for each key it leaves out — and all that an id listed
+# nowhere gets. Such an id is assumed current, so it reasons, and its limits
+# are floors across current models, so guessing cannot exceed what one accepts.
+#
+# Display name. Empty shows the model id.
+name = ""
+# "anthropic", or an endpoint above. It is what routes `--model <id>` with no
+# --provider flag; empty leaves it to agent.provider. Pointing a model at a
+# gateway or a local server is just this line.
+provider = ""
+context_window = 200_000
+max_tokens = 8_192
+# Gates the thinking request an adapter sends.
+supports_reasoning = true
+# How hard it is asked to think, in its provider's own terms: "low", "high", …
+# — whatever that API takes as an effort, sent as is. Empty leaves it to
+# agent.reasoning_effort, and if that is empty too, nothing is sent.
+reasoning_effort = ""
+# Recorded, not acted on: nothing checks either before sending.
+supports_images = false
+supports_server_tools = false
+
+[defaults.model.price]
+# USD per million tokens, used only to show a cost; nothing is enforced. The
+# four rates mirror `Usage`. An all-zero price shows no cost rather than a free
+# one, which is also how to switch off a shipped one.
+input = 0.0
+output = 0.0
+# Prompt tokens served from the cache.
+cache_read = 0.0
+# Prompt tokens written to the cache. Providers that cache implicitly (OpenAI,
+# DeepSeek, GLM) report no writes, so this rate never applies to them.
+cache_write = 0.0
+
+# Claude. Anthropic's first-party rates as published mid-2026 (Fable 5's from
+# 2026-10), with cache_write at the 5-minute-TTL premium, 1.25x input. Bedrock
+# and Vertex bill separately.
+
+[models.claude-fable-5]  # claude-fable-5 is the model id the api will be sending
+name = "Claude Fable 5"
+provider = "anthropic"
+context_window = 1_000_000
+max_tokens = 128_000
+# Always thinks: it rejects both a budget and `disabled`, which leaves
+# adaptive — what the adapter sends any model not on the budget list.
+supports_reasoning = true
+supports_images = true
+supports_server_tools = true
+price = { input = 10.0, output = 50.0, cache_read = 1.0, cache_write = 12.5 }
+
+[models.claude-opus-5]
+name = "Claude Opus 5"
+provider = "anthropic"
+context_window = 1_000_000
+max_tokens = 32_000
+supports_reasoning = true
+supports_images = true
+supports_server_tools = true
+price = { input = 5.0, output = 25.0, cache_read = 0.5, cache_write = 6.25 }
+
+[models.claude-sonnet-5]
+name = "Claude Sonnet 5"
+provider = "anthropic"
+context_window = 1_000_000
+max_tokens = 64_000
+supports_reasoning = true
+supports_images = true
+supports_server_tools = true
+price = { input = 2.0, output = 10.0, cache_read = 0.2, cache_write = 2.5 }
+
+[models.claude-haiku-4-5-20251001]
+name = "Claude Haiku 4.5"
+provider = "anthropic"
+context_window = 200_000
+max_tokens = 8_192
+# Extended thinking, the budgeted kind — see budget_thinking_models in
+# [providers.anthropic] above.
+supports_reasoning = true
+supports_images = true
+supports_server_tools = true
+price = { input = 1.0, output = 5.0, cache_read = 0.1, cache_write = 1.25 }
+
+# OpenAI: the three GPT-6 flagships as of 2026-10, largest first. Each has a
+# documented "1,050,000 context window" and "128,000 max output tokens".
+#
+# Standard-tier rates (2026-10). A request over 272K input tokens bills at
+# long-context rates — input and cache reads 2x, output 1.5x — which one rate
+# cannot follow, so a cost shown for one runs low. OpenAI charges for cache
+# writes on some models, but the Responses adapter reports no write tokens, so
+# they count as `input` and cache_write is left at zero.
+
+[models.gpt-6-astra]
+name = "GPT-6 Astra"
+provider = "openai"
+context_window = 1_050_000
+max_tokens = 128_000
+supports_reasoning = true
+supports_images = true
+supports_server_tools = true
+price = { input = 10.0, output = 50.0, cache_read = 1.0 }
+
+[models."gpt-6.1-sol"]
+name = "GPT-6.1 Sol"
+provider = "openai"
+context_window = 1_050_000
+max_tokens = 128_000
+supports_reasoning = true
+supports_images = true
+supports_server_tools = true
+price = { input = 2.0, output = 10.0, cache_read = 0.1 }
+
+[models.gpt-6-luna]
+name = "GPT-6 Luna"
+provider = "openai"
+context_window = 1_050_000
+max_tokens = 128_000
+supports_reasoning = true
+supports_images = true
+supports_server_tools = true
+price = { input = 0.1, output = 0.5, cache_read = 0.01 }
+
+# DeepSeek: the two ids its API accepts as of 2026-09. Both think by default,
+# and reasoning counts against max_tokens — so the ceiling is DeepSeek's
+# documented default for thinking mode ("64K"), not the 8K non-thinking one,
+# which a long chain of thought would exhaust before the answer began.
+# `supports_reasoning` gates `reasoning_effort` in the request; reasoning
+# deltas are read whatever it says, since a model that streams them means them.
+#
+# PEAK rates (2026-10), which apply 01:00-04:00 and 06:00-10:00 UTC on weekdays
+# other than Chinese public holidays. Every other hour costs half, but one rate
+# cannot follow the clock, so these take the higher one: a shown cost may run
+# high, never low. `input` is the cache-miss rate, and there is no cache_write
+# — DeepSeek charges nothing to fill its cache.
+
+[models.deepseek-flash]
+name = "DeepSeek Flash"
+provider = "deepseek"
+context_window = 1_000_000
+max_tokens = 64_000
+supports_reasoning = true
+price = { input = 0.3, output = 1.2, cache_read = 0.006 }
+
+[models.deepseek-v4-pro]
+name = "DeepSeek V4 Pro"
+provider = "deepseek"
+context_window = 1_000_000
+max_tokens = 64_000
+supports_reasoning = true
+price = { input = 1.32, output = 3.96, cache_read = 0.044 }
+
+# GLM: Z.ai's lineup (2026-10), flagship first. Limits are given only for the
+# ids whose limits Z.ai documents on a model page, with its documented maximum
+# output ("128K"); the rest take the conservative defaults.
+#
+# Z.ai's international list rates (2026-10). The glm endpoint above is the
+# MAINLAND one, which bills in CNY at its own rates — override these if that is
+# the one you use. Z.ai's cache storage is "limited-time free", so there is no
+# cache_write. Quoted names: a bare TOML key cannot contain a dot.
+
+[models."glm-5.3"]
+name = "GLM-5.3"
+provider = "glm"
+context_window = 1_000_000
+max_tokens = 128_000
+supports_reasoning = true
+price = { input = 1.4, output = 4.4, cache_read = 0.26 }
+
+[models."glm-5.3-flash"]
+name = "GLM-5.3-Flash"
+provider = "glm"
+context_window = 1_000_000
+max_tokens = 128_000
+supports_reasoning = true
+price = { input = 0.15, output = 0.5, cache_read = 0.03 }
+
+[models."glm-5.3-flashx"]
+name = "GLM-5.3-FlashX"
+provider = "glm"
+context_window = 1_000_000
+max_tokens = 128_000
+supports_reasoning = true
+price = { input = 0.37, output = 1.25, cache_read = 0.075 }
+
+[models."glm-5.2"]
+name = "GLM-5.2"
+provider = "glm"
+price = { input = 1.4, output = 4.4, cache_read = 0.26 }
+
+[models."glm-5.1"]
+name = "GLM-5.1"
+provider = "glm"
+price = { input = 1.4, output = 4.4, cache_read = 0.26 }
+
+[models."glm-5"]
+name = "GLM-5"
+provider = "glm"
+price = { input = 1.0, output = 3.2, cache_read = 0.2 }
+
+[models."glm-4.7"]
+name = "GLM-4.7"
+provider = "glm"
+context_window = 200_000
+max_tokens = 128_000
+supports_reasoning = true
+price = { input = 0.6, output = 2.2, cache_read = 0.11 }
+
+[models."glm-4.6"]
+name = "GLM-4.6"
+provider = "glm"
+context_window = 200_000
+max_tokens = 128_000
+supports_reasoning = true
+price = { input = 0.6, output = 2.2, cache_read = 0.11 }

@@ -20,9 +20,9 @@ import httpx
 import pytest
 from pydantic import BaseModel
 
-from lab_harness.agent import Agent
-from lab_harness.config import Config, OpenAIConfig, profile_defaults
-from lab_harness.llm.events import (
+from pyharnx.agent import Agent
+from pyharnx.config import Config, OpenAIConfig, profile_defaults
+from pyharnx.llm.events import (
     StreamDone,
     StreamError,
     StreamEvent,
@@ -37,11 +37,11 @@ from lab_harness.llm.events import (
     ToolCallEnd,
     ToolCallStart,
 )
-from lab_harness.llm.provider import StreamOptions
-from lab_harness.llm.providers import _http
-from lab_harness.llm.providers.chat_completions import ChatCompletionsProvider
-from lab_harness.llm.registry import resolve_model
-from lab_harness.llm.types import (
+from pyharnx.llm.provider import StreamOptions
+from pyharnx.llm.providers import _http
+from pyharnx.llm.providers.chat_completions import ChatCompletionsProvider
+from pyharnx.llm.registry import resolve_model
+from pyharnx.llm.types import (
     AssistantMessage,
     Context,
     ImageBlock,
@@ -55,7 +55,7 @@ from lab_harness.llm.types import (
     UserMessage,
     text,
 )
-from lab_harness.tools.base import ToolContext, ToolResult, ok, tool
+from pyharnx.tools.base import ToolContext, ToolResult, ok, tool
 from tests.entries import profile_entry, retrying_profile
 from tests.http_fakes import (
     TEST_KEY,
@@ -1495,7 +1495,7 @@ async def test_the_log_names_the_response_and_its_finish_reason_as_sent(
     first = {"id": "chatcmpl-42", "model": "deepseek-v4-flash", **delta(content="hi")}
     body = sse(first, {"id": "chatcmpl-42", **finish("content_filter")})
 
-    with caplog.at_level(logging.DEBUG, logger="lab_harness.llm.providers.chat_completions"):
+    with caplog.at_level(logging.DEBUG, logger="pyharnx.llm.providers.chat_completions"):
         await collect(provider(Recorder(body)))
 
     assert "Response chatcmpl-42 from deepseek-v4-flash" in caplog.text
@@ -1517,7 +1517,7 @@ async def test_the_log_counts_the_turns_whose_reasoning_goes_back(
     plain = AssistantMessage(content=(TextBlock(text="b"),), model=MODEL.id, provider="deepseek")
     user = UserMessage(content=text("go"))
 
-    with caplog.at_level(logging.DEBUG, logger="lab_harness.llm.providers.chat_completions"):
+    with caplog.at_level(logging.DEBUG, logger="pyharnx.llm.providers.chat_completions"):
         await collect(provider(Recorder(sse(finish())), config), ctx((user, reasoned, plain, user)))
 
     assert "Reasoning replayed on 1 turn(s) as reasoning_content" in caplog.text

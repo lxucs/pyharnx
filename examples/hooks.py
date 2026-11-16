@@ -18,8 +18,8 @@ import asyncio
 import re
 import sys
 
-from lab_harness.agent import Agent, AgentEvent
-from lab_harness.agent.types import (
+from pyharnx.agent import Agent, AgentEvent
+from pyharnx.agent.types import (
     AfterToolCallContext,
     AfterToolCallResult,
     BeforeToolCallContext,
@@ -29,10 +29,10 @@ from lab_harness.agent.types import (
     PrepareRequestContext,
     RequestUpdate,
 )
-from lab_harness.config import load_config
-from lab_harness.llm.providers import route
-from lab_harness.llm.types import AssistantMessage, TextBlock, UserMessage, text
-from lab_harness.tools import default_registry
+from pyharnx.config import load_config
+from pyharnx.llm.providers import route
+from pyharnx.llm.types import AssistantMessage, TextBlock, UserMessage, text
+from pyharnx.tools import default_registry
 
 PROMPT = "Find where the agent loop decides a run is finished, and explain it in two sentences."
 READ_ONLY_TOOLS = ["read", "ls", "grep", "glob"]

@@ -15,7 +15,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
-from lab_harness.tools import FunctionTool, ToolContext, ToolResult, fail, ok, tool
+from pyharnx.tools import FunctionTool, ToolContext, ToolResult, fail, ok, tool
 
 #: The name as config and the tool list know it.
 SEARCH_NAME = "search_docs"

@@ -1,21 +1,24 @@
-# How to cite lab-harness. GitHub reads this file for the repository's
+# How to cite pyharnx. GitHub reads this file for the repository's
 # "Cite this repository" button, which offers it as APA and BibTeX.
 cff-version: 1.2.0
-message: If you use lab-harness in your research, please cite it as below.
+message: If you use pyharnx in your research, please cite it as below.
 type: software
-title: "lab-harness: a minimal agent harness in Python, built for research"
+version: 0.1.0
+title: "pyharnx: a minimal agent harness in Python, built for experiments"
 abstract: >-
-  An agent harness in python small enough to read in an afternoon: one agentic loop
-  across vendors, every step a typed event, and every request reproducible
-  from its transcript.
+  A minimal agent harness in Python, built for experiments, and a lightweight
+  alternative to pi: small enough to read in an afternoon, with one agentic
+  loop across vendors, every step a typed event, and every request
+  reproducible from its transcript.
 authors:
   - given-names: Liyan
     family-names: Xu
-repository-code: https://github.com/lxucs/lab-harness
+repository-code: https://github.com/lxucs/pyharnx
 license: MIT
 keywords:
   - agents
   - llm
   - agent harness
+  - experiments
   - research
   - reproducibility

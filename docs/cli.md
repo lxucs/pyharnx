@@ -3,10 +3,10 @@
 ## Modes
 
 ```bash
-lab-harness                      # interactive
-lab-harness -p "fix the lints"   # one-shot, plain text
-lab-harness -p "..." --json      # one-shot, JSONL event stream
-lab-harness --resume ID          # continue a session; --resume alone lists them
+pyharnx                          # interactive
+pyharnx -p "fix the lints"       # one-shot, plain text
+pyharnx -p "..." --json          # one-shot, JSONL event stream
+pyharnx --resume ID              # continue a session; --resume alone lists them
 ```
 
 All of these are **subscribers to the same event stream**. The interactive
@@ -19,7 +19,7 @@ what the runtime does.
 |---|---|
 | `-p`, `--prompt` | Run one prompt and exit. Omit it to start the interactive terminal. |
 | `--json` | Emit the raw event stream as JSONL instead of rendered text. One-shot mode only — an interactive session renders instead |
-| `--model` | Model id. Beats `$LAB_HARNESS_MODEL`, which beats `agent.model` in config. |
+| `--model` | Model id. Beats `$PYHARNX_MODEL`, which beats `agent.model` in config. |
 | `--provider` | `anthropic` or a configured `providers.openai` profile. Normally inferred from the model id. |
 | `--reasoning-effort` | How hard a reasoning model thinks, in its provider's terms — `low`, `high`, …. Beats the model's `reasoning_effort` and `agent.reasoning_effort`; `""` sends none. See [Reasoning effort](#reasoning-effort). |
 | `--cwd` | Working directory for tools, config discovery, *and* project instructions. Defaults to the current directory; `~` is expanded, and a path that is not a directory is a startup error |
@@ -27,7 +27,7 @@ what the runtime does.
 | `--skills` | Comma-separated skills to make available, e.g. `commit,release`. Beats `skills.selected` in config; `""` makes none available. |
 | `--system-prompt` | Replaces `prompts.system` for this run. The other sections, project instructions included, are still sent. A template like any other section, so `{agent_model}` in it is filled |
 | `--system-prompt-file` | The same, read from a file. Exclusive with `--system-prompt`. |
-| `--log-level` | `debug`, `info`, `warning` or `error`. Beats `$LAB_HARNESS_LOG_LEVEL`, which beats `logging.level` in config. |
+| `--log-level` | `debug`, `info`, `warning` or `error`. Beats `$PYHARNX_LOG_LEVEL`, which beats `logging.level` in config. |
 | `--yes` | Skip tool approval prompts in interactive mode. |
 | `--resume [ID]` | Continue the session with this id; a unique prefix works. Interactive mode prints the saved conversation on resuming. With no id, list this directory's sessions and exit. |
 | `--export [ID]` | Write the session as one HTML page beside its transcript, print its path, and exit. With no id, this directory's most recent session. |
@@ -35,11 +35,11 @@ what the runtime does.
 
 **Exit status is meaningful.** A run whose final turn ended in `error` or
 `aborted` exits `1`; a clean run exits `0`; `Ctrl-C` exits `130`. A script
-piping this needs to tell a refusal from an outage — and the words a cancelled
-run had reached are on stdout either way.
+piping this needs to tell a refusal from an outage — and the messages a
+cancelled run had finished are on stdout either way.
 
 In plain-text mode, assistant text goes to **stdout** while tool-call notices
-and errors go to **stderr**, so `lab-harness -p "…" > answer.txt` captures the
+and errors go to **stderr**, so `pyharnx -p "…" > answer.txt` captures the
 answer alone. Diagnostics follow the same rule — see
 [Diagnostics](#diagnostics) below.
 
@@ -53,7 +53,7 @@ asked to think, before anything else it has to say:
 
 ```
 ╭───────────────────────────────────────────────────────────╮
-│ lab-harness · gpt-6-luna via openai · effort medium       │
+│ pyharnx · gpt-6-luna via openai · effort medium       │
 │ ~/projects/my-project                                     │
 │ / for commands · Ctrl-C cancels · Ctrl-O toggles thinking │
 ╰───────────────────────────────────────────────────────────╯
@@ -78,8 +78,8 @@ the way it does with any other command.
 
 ⏺ The backoff cap is applied after the jitter. Moving it.
 
-⏺ Edit(lab_harness/llm/providers/_http.py)
-  ⎿  Replaced 1 occurrence(s) in lab_harness/llm/providers/_http.py  +2 -1
+⏺ Edit(pyharnx/llm/providers/_http.py)
+  ⎿  Replaced 1 occurrence(s) in pyharnx/llm/providers/_http.py  +2 -1
     41       for attempt in range(retries):
     42 -         delay = jitter(base * 2**attempt)
     42 +         delay = min(base * 2**attempt, cap)
@@ -164,7 +164,7 @@ the terminal, unechoed, and appears at the next prompt — submitted at once if
 it ended with Enter. The runtime itself refuses a second concurrent `prompt()`
 rather than coordinating with the one in flight.
 
-**What you type is kept**, in `~/.lab-harness/history` by default, so `Up` in a
+**What you type is kept**, in `~/.pyharnx/history` by default, so `Up` in a
 later session recalls an earlier one's prompts. Set `session.enabled = false`
 and nothing is persisted, history included.
 
@@ -192,7 +192,7 @@ rather than sending:
 | `/model [ID]` | Show the model, or switch to another one this session's provider serves |
 | `/tools [NAMES]` | Show the tools this session has, or choose them — `read,skill`; `none` is none |
 | `/skills [NAMES]` | List the skills that apply, or choose them — `commit,release`; `none` is none |
-| `/export [PATH]` | Write the session so far as an HTML page beside its transcript, or to `PATH` — a file, or a directory to put it in; relative to the session's directory. Again replaces it |
+| `/export [PATH]` | Write the session so far as an HTML page beside its transcript, or to `PATH` — a file, or a directory to put it in; relative to the working directory. Again replaces it |
 | `/clear` | Forget the conversation and start over; the transcript keeps what came before |
 | `/help` | List the commands |
 | `/exit`, `/quit`, `exit` | Exit |
@@ -238,7 +238,7 @@ slash and goes to the model. A name that is no command, such as `/stauts`, is
 reported rather than sent.
 
 Every command is an entry in one registry, `Commands` in
-[`cli/commands.py`](../lab_harness/cli/commands.py), which both runs and lists
+[`cli/commands.py`](../pyharnx/cli/commands.py), which both runs and lists
 it. A new one is a name, a one-line description and an async handler given the
 rest of the line, added with `terminal.commands.add(Command(...))` — it is
 listed, completed and run with nothing else to change.
@@ -311,12 +311,12 @@ figures are real. Another Chat Completions vendor counts only if it reports
 One event per line, flushed as it happens:
 
 ```bash
-$ lab-harness -p "what files are here?" --json
+$ pyharnx -p "what files are here?" --json
 {"system_prompt": "...", "tools": [...], "model": {"id": "gpt-6-luna", ...}, "history": 0, "type": "agent_start"}
 {"type": "turn_start"}
 {"message": {"content": [], "model": "...", "stop_reason": "stop", ...}, "type": "message_start"}
 {"tool_call_id": "c1", "tool_name": "ls", "arguments": {}, "type": "tool_execution_start"}
-{"tool_call_id": "c1", "tool_name": "ls", "content": [...], "is_error": false, "duration_ms": 1, "details": {"path": ".", "entries": 4, "total_entries": 4}, "type": "tool_execution_end"}
+{"tool_call_id": "c1", "tool_name": "ls", "content": [...], "is_error": false, "duration_ms": 1, "details": {"path": ".", "entries": 4, "offset": 0, "total_entries": 4}, "type": "tool_execution_end"}
 {"type": "turn_end", ...}
 {"type": "agent_end", "messages": [...]}
 ```
@@ -325,17 +325,17 @@ Pipe it into `jq`, or use it as the assertion surface for end-to-end tests —
 checking a structured event stream beats scraping rendered terminal output.
 
 Every line round-trips back into real event objects through
-`lab_harness.llm.serde`, which is what makes a consumer in another language
+`pyharnx.llm.serde`, which is what makes a consumer in another language
 possible. See [events.md](events.md).
 
 ## Sessions
 
-Every run is saved, per project, under `~/.lab-harness/sessions/`:
+Every run is saved, per project, under `~/.pyharnx/sessions/`:
 
 ```bash
-lab-harness --resume              # what is saved for this directory
-lab-harness --resume 20261010T11  # continue one; a unique prefix works
-lab-harness -p "…" --no-save      # run without persisting
+pyharnx --resume                  # what is saved for this directory
+pyharnx --resume 20261010T11      # continue one; a unique prefix works
+pyharnx -p "…" --no-save          # run without persisting
 ```
 
 Resume continues writing to the *same* file, so a conversation stays one
@@ -344,7 +344,7 @@ directory — resuming in one project never surfaces another's history.
 
 The interactive terminal prints the saved conversation before the first
 prompt, drawn exactly as new turns are and expandable with Ctrl-O, headed by a
-rule that says it is old: `── Resumed 20261010T11 — 12 message(s) ──`. With
+rule that says it is old: `── Resumed 20261010T110412-3f9a2c — 12 message(s) ──`. With
 `--no-save` it is a read-only view — nothing is appended to the file.
 
 `--export [ID]` writes the session as one self-contained HTML page beside its
@@ -368,11 +368,11 @@ management, the skills found — and last the project's instructions. It names n
 tools: what the model can call comes from the tool declarations alone, so
 narrowing `--tools` never leaves the prompt describing a tool that is not
 there. The text ships in
-[`lab_harness/prompts/prompts.toml`](../lab_harness/prompts/prompts.toml).
+[`pyharnx/prompts/prompts.toml`](../pyharnx/prompts/prompts.toml).
 
 ```bash
-lab-harness --system-prompt "Answer in one sentence."
-lab-harness --system-prompt-file prompts/terse.md
+pyharnx --system-prompt "Answer in one sentence."
+pyharnx --system-prompt-file prompts/terse.md
 ```
 
 Either replaces `prompts.system` for one run; the other sections and the
@@ -417,18 +417,18 @@ recorded session opens a new segment there.
 ## Choosing a model
 
 ```bash
-lab-harness --model claude-opus-5          # Anthropic, Messages API
-lab-harness --model gpt-6-luna             # OpenAI, Responses API
-lab-harness --model deepseek-flash         # DeepSeek, Chat Completions
-lab-harness --model glm-5.3                # GLM, Chat Completions
-lab-harness --model their-model --provider groq
+pyharnx --model claude-opus-5              # Anthropic, Messages API
+pyharnx --model gpt-6-luna                 # OpenAI, Responses API
+pyharnx --model deepseek-flash             # DeepSeek, Chat Completions
+pyharnx --model glm-5.3                    # GLM, Chat Completions
+pyharnx --model their-model --provider groq
 ```
 
 The provider is inferred from the model id, so `--provider` is only needed for
 an id the catalog does not list — and not even then if OpenAI serves it, where
 such an id goes by default (`agent.provider`). OpenAI, DeepSeek and GLM are
 configured out of the box, in
-[`lab_harness/llm/catalog.toml`](../lab_harness/llm/catalog.toml); any other
+[`pyharnx/llm/catalog.toml`](../pyharnx/llm/catalog.toml); any other
 endpoint speaking either protocol is a few lines of config —
 [configuration.md](configuration.md#provider-profiles).
 
@@ -451,8 +451,8 @@ provider's default. `--reasoning-effort ""` and `/effort default` mean the same
 for one run or the rest of a session, whatever config says.
 
 ```bash
-lab-harness --reasoning-effort low            # quick answers
-lab-harness --model glm-5.3 --reasoning-effort high
+pyharnx --reasoning-effort low                # quick answers
+pyharnx --model glm-5.3 --reasoning-effort high
 ```
 
 ```toml
@@ -483,9 +483,9 @@ place claims one.
 ## Diagnostics
 
 ```bash
-lab-harness --log-level debug -p "…"              # trace this run
-LAB_HARNESS_LOG_LEVEL=debug lab-harness           # trace this shell
-lab-harness --log-level debug 2> lab-harness.log  # interactive, trace kept apart
+pyharnx --log-level debug -p "…"                  # trace this run
+PYHARNX_LOG_LEVEL=debug pyharnx                   # trace this shell
+pyharnx --log-level debug 2> pyharnx.log          # interactive, trace kept apart
 ```
 
 Logs go to **stderr**, so they never mix into the answer on stdout or the JSONL
@@ -498,24 +498,24 @@ warnings.
 In the interactive terminal they print in scrollback, dimmed, above the live
 region — straight to the terminal, a record would land inside the region and
 break its next redraw. To keep them out of the conversation, redirect stderr
-and `tail -f lab-harness.log` in another pane.
+and `tail -f pyharnx.log` in another pane.
 
 `info` adds the decisions — which model, from where, which provider and why,
 which tools, which system prompt — and one line per run. `debug` adds the trace: every request, response and tool
 call, with the ids that find each one in the transcript and in `--json`:
 
 ```
-DEBUG lab_harness.agent.loop: Turn 1/50: 1 message(s) to claude-sonnet-5
-DEBUG lab_harness.llm.providers.anthropic: Request to claude-sonnet-5: max_tokens=64000 messages=1 system=429 tools=9 thinking={"type":"adaptive","display":"summarized"}
-DEBUG lab_harness.llm.providers.anthropic: Response msg_01ExampleId from claude-sonnet-5
-DEBUG lab_harness.llm.providers.anthropic: Response stop_reason=tool_use
-DEBUG lab_harness.agent.loop: Response stop=tool_use thinking=212 text=31 tool_calls=1 in=1520 cache_read=0 cache_write=0 out=96 time=2.1s first_token=0.8s
-DEBUG lab_harness.agent.loop: Tool call toolu_01ExampleId: bash(command)
-DEBUG lab_harness.cli.approval: Tool call toolu_01ExampleId: approval answered 'yes'
-DEBUG lab_harness.agent.loop: Tool call toolu_01ExampleId: ok in 1515ms exit_code=0 truncated=False
-DEBUG lab_harness.agent.loop: Turn 2/50: 3 message(s) to claude-sonnet-5
+DEBUG pyharnx.agent.loop: Turn 1/50: 1 message(s) to claude-sonnet-5
+DEBUG pyharnx.llm.providers.anthropic: Request to claude-sonnet-5: max_tokens=64000 messages=1 system=429 tools=9 thinking={"type":"adaptive","display":"summarized"}
+DEBUG pyharnx.llm.providers.anthropic: Response msg_01ExampleId from claude-sonnet-5
+DEBUG pyharnx.llm.providers.anthropic: Response stop_reason=tool_use
+DEBUG pyharnx.agent.loop: Response stop=tool_use thinking=212 text=31 tool_calls=1 in=1520 cache_read=0 cache_write=0 out=96 time=2.1s first_token=0.8s
+DEBUG pyharnx.agent.loop: Tool call toolu_01ExampleId: bash(command)
+DEBUG pyharnx.cli.approval: Tool call toolu_01ExampleId: approval answered 'yes'
+DEBUG pyharnx.agent.loop: Tool call toolu_01ExampleId: ok in 1515ms exit_code=0 truncated=False
+DEBUG pyharnx.agent.loop: Turn 2/50: 3 message(s) to claude-sonnet-5
 …
-INFO lab_harness.agent.loop: Run finished: requests=2 tool_calls=1 failed=0 stop=stop in=3170 out=180 time=4.7s
+INFO pyharnx.agent.loop: Run finished: requests=2 tool_calls=1 failed=0 stop=stop in=3170 out=180 time=4.7s
 ```
 
 The stop reason appears twice on purpose: the adapter's is what the vendor
@@ -527,10 +527,10 @@ logged by size, tool calls by their argument *names*.
 appears to do nothing — every file read or skipped, in precedence order:
 
 ```
-DEBUG lab_harness.config: No config file at /home/you/.lab-harness/config.toml
-DEBUG lab_harness.config: No config file at /home/you/.lab-harness/config.local.toml
-DEBUG lab_harness.config: Applying config from /repo/.lab-harness/config.toml
-DEBUG lab_harness.config: No config file at /repo/.lab-harness/config.local.toml
+DEBUG pyharnx.config: No config file at /home/you/.pyharnx/config.toml
+DEBUG pyharnx.config: No config file at /home/you/.pyharnx/config.local.toml
+DEBUG pyharnx.config: Applying config from /repo/.pyharnx/config.toml
+DEBUG pyharnx.config: No config file at /repo/.pyharnx/config.local.toml
 ```
 
 Levels, what each one adds, and why a level set in a config file cannot report
@@ -539,8 +539,8 @@ that same file being read:
 
 ## Web tools
 
-`web_search` and `web_fetch` are enabled by default in the interactive
-terminal. Search needs a `TAVILY_API_KEY` (or `backend = "ddgs"` in config);
+`web_search` and `web_fetch` are enabled by default, in the interactive
+terminal and in `-p` alike. Search needs a `TAVILY_API_KEY` (or `backend = "ddgs"` in config);
 fetch needs nothing.
 
 Neither is approval-gated. They are read-only with respect to your machine, and
@@ -556,7 +556,7 @@ Mutating tools (`bash`, `write`, `edit`) prompt before executing:
 
 ```
 ⏺ Bash(rm -rf build/)
-Allow bash? [y]es / [n]o / [a]lways
+Allow Bash? [y]es / [n]o / [a]lways
 ```
 
 The call line is cut to one short line, so a longer command is printed in
@@ -565,11 +565,11 @@ unseen. For the same reason an `edit` shows the change it will make, and a
 `write` the content it will write:
 
 ```
-⏺ Edit(lab_harness/config.py)
+⏺ Edit(pyharnx/config.py)
           max_turns: int = 50
     -     parallel_tools: bool = False
     +     parallel_tools: bool = True
-Allow edit? [y]es / [n]o / [a]lways
+Allow Edit? [y]es / [n]o / [a]lways
 ```
 
 The edit preview has no line numbers: it is built from the call's arguments,
@@ -579,8 +579,9 @@ result that follows has them.
 This is a `before_tool_call` hook, not loop logic — see
 [tools.md](tools.md#approval) for the full contract.
 
-**It fails closed.** Only `y`/`yes` and `a`/`always` proceed; a bare Enter, an
-unrecognized answer, Ctrl-C, and Ctrl-D all deny. Ctrl-C denies *and* ends the
+**It fails closed.** Only `y`/`yes` and `a`/`always` proceed — the letter or
+the whole word, never a first letter, so `abort` is not `always`; a bare Enter,
+an unrecognized answer, Ctrl-C, and Ctrl-D all deny. Ctrl-C denies *and* ends the
 turn, the way it does anywhere else in a run: refusing one call and carrying on
 would spend another request on a run the user walked out of, and ask again for
 the next call in the same batch. `always` is remembered for the

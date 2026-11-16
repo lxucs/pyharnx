@@ -5,7 +5,7 @@
 Append-only JSONL, one file per session:
 
 ```
-~/.lab-harness/sessions/<project-slug>/<session-id>.jsonl
+~/.pyharnx/sessions/<project-slug>/<session-id>.jsonl
 ```
 
 Line 1 is the header; every subsequent line is one entry.
@@ -23,7 +23,8 @@ Line 1 is the header; every subsequent line is one entry.
 Every invocation — the first run, and each `--resume` after it — writes one
 `context` entry before its messages, and so does every run that starts with a
 different system prompt, tool set, model or reasoning effort than the last
-entry records. That entry and the messages after it are a **segment**.
+entry records — or with a history other than the messages already recorded,
+as the first run after `/clear` does. That entry and the messages after it are a **segment**.
 
 **Append-only, flushed per line.** A crashed or killed run leaves a readable
 transcript up to its last completed message. That is the whole durability
@@ -32,7 +33,7 @@ story — the cheap, boring format survives what a clever one would not.
 ### The project slug
 
 ```
-lab-harness-3f9a2c01
+pyharnx-3f9a2c01
 └─┬───┘ └─┬─────┘
   │       └ first 8 hex of sha256(absolute path)
   └ directory name, sanitized
@@ -81,7 +82,7 @@ A transcript holds everything needed to rebuild every request the session made,
 exactly as the provider received it, alongside the response it got:
 
 ```python
-from lab_harness.session import read_transcript, recorded_requests
+from pyharnx.session import read_transcript, recorded_requests
 
 for step in recorded_requests(read_transcript(path)):
     step.request  # Context: system_prompt, messages, tools — what was sent
@@ -104,8 +105,8 @@ JSON body it posted — for a Chat Completions endpoint, OpenAI-format
 and the format training frameworks read:
 
 ```python
-from lab_harness.config import from_snapshot
-from lab_harness.llm.providers import build_provider
+from pyharnx.config import from_snapshot
+from pyharnx.llm.providers import build_provider
 
 adapter = build_provider(step.model.provider, from_snapshot(step.config))
 adapter.request_body(step.model, step.request)  # the body, as posted
@@ -160,9 +161,9 @@ from dataclasses import replace
 
 from transformers import AutoTokenizer
 
-from lab_harness.config import profile_defaults
-from lab_harness.llm.providers import ChatCompletionsProvider
-from lab_harness.session import read_transcript, recorded_requests
+from pyharnx.config import profile_defaults
+from pyharnx.llm.providers import ChatCompletionsProvider
+from pyharnx.session import read_transcript, recorded_requests
 
 last = recorded_requests(read_transcript(path))[-1]
 trajectory = replace(last.request, messages=(*last.request.messages, last.response))
@@ -219,7 +220,8 @@ await agent.prompt("...")  # recorded under the new context
 ```
 
 Each run's `agent_start` event carries what it is sent with, and the recorder
-writes a new `context` entry when that differs from the last one, before the
+writes a new `context` entry when that differs from the last one — or when the
+run's history does not continue the transcript, as after `/clear` — before the
 run's first message. A session that changes nothing writes nothing extra.
 
 `/tools` and `/skills` do the same from the terminal, and rebuild the system
@@ -236,7 +238,8 @@ writes it as a `rewrite` entry, and `recorded_requests` rebuilds that request
 from it: the hook's messages and model, the segment's prompt and tools.
 
 A `rewrite` holds the whole view it sent, so a hook that rewrites every
-request grows the file by a view per request. The CLI installs no hook.
+request grows the file by a view per request. The CLI installs no
+`prepare_request` hook.
 Compaction, when it lands, will add its own entry to write a summary once
 rather than with every request.
 
@@ -312,9 +315,9 @@ timestamps read as empty.
 ## Resume
 
 ```bash
-lab-harness --resume              # list what is saved for this directory
-lab-harness --resume <session-id> # continue one; a unique prefix works
-lab-harness --no-save             # run without persisting anything
+pyharnx --resume                  # list what is saved for this directory
+pyharnx --resume <session-id> # continue one; a unique prefix works
+pyharnx --no-save                 # run without persisting anything
 ```
 
 `--resume` alone lists and exits rather than continuing the most recent
@@ -375,8 +378,8 @@ terminal shows the history anyway, by drawing it directly through the renderer
 
 | Command | Shows |
 |---|---|
-| `lab-harness --resume ID --no-save` | The conversation in the terminal, read-only |
-| `lab-harness --export [ID]`, or `/export [PATH]` in a session | One self-contained HTML page beside the transcript, or at `PATH`: the conversation, every segment's context, usage, cost and retries per request |
+| `pyharnx --resume ID --no-save` | The conversation in the terminal, read-only |
+| `pyharnx --export [ID]`, or `/export [PATH]` in a session | One self-contained HTML page beside the transcript, or at `PATH`: the conversation, every segment's context, usage, cost and retries per request |
 | `examples/trajectories.py [ID]` | Every request exactly as sent, one JSON line each; `--wire` as the endpoint received it |
 
 The page is a view, not a record: it is written next to the `.jsonl` unless
@@ -386,12 +389,12 @@ The page is a view, not a record: it is written next to the `.jsonl` unless
 
 | Key | Default | Purpose |
 |---|---|---|
-| `session.home` | `~/.lab-harness` | Root for all harness state |
-| `session.home_env` | `LAB_HARNESS_HOME` | Env var that overrides it |
+| `session.home` | `~/.pyharnx` | Root for all harness state |
+| `session.home_env` | `PYHARNX_HOME` | Env var that overrides it |
 | `session.directory_name` | `sessions` | Subdirectory holding projects |
 | `session.history_file` | `history` | File in `home` keeping typed lines, for `Up` in a later session |
 | `session.enabled` | `true` | Write transcripts at all — off means nothing is persisted |
 | `session.version` | `5` | Schema version written to each header |
 
-Tests redirect `LAB_HARNESS_HOME` through an autouse fixture, so the suite can never
-write to a real `~/.lab-harness`.
+Tests redirect `PYHARNX_HOME` through an autouse fixture, so the suite can never
+write to a real `~/.pyharnx`.

@@ -1,6 +1,6 @@
 """Export a saved session as JSONL: one line per request it made.
 
-    uv run lab-harness -p "What does this project do?"     # record a session
+    uv run pyharnx -p "What does this project do?"     # record a session
     uv run python examples/trajectories.py > requests.jsonl
     uv run python examples/trajectories.py <session-id>    # a given session; a prefix works
     uv run python examples/trajectories.py --wire          # as the provider received it
@@ -23,10 +23,10 @@ import argparse
 import json
 import sys
 
-from lab_harness.config import from_snapshot, load_config
-from lab_harness.llm.providers import build_provider
-from lab_harness.llm.serde import to_dict
-from lab_harness.session import (
+from pyharnx.config import from_snapshot, load_config
+from pyharnx.llm.providers import build_provider
+from pyharnx.llm.serde import to_dict
+from pyharnx.session import (
     RecordedRequest,
     find_session,
     latest_session,
@@ -46,7 +46,7 @@ def main(session_id: str | None, *, wire: bool = False) -> int:
         print(exc, file=sys.stderr)
         return 1
     if path is None:
-        print("No saved session for this directory. Run lab-harness here first.", file=sys.stderr)
+        print("No saved session for this directory. Run pyharnx here first.", file=sys.stderr)
         return 1
 
     for step in recorded_requests(read_transcript(path)):

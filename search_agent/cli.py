@@ -16,11 +16,11 @@ from pathlib import Path
 
 from rich.console import Console
 
-from lab_harness.agent.agent import Listener
-from lab_harness.agent.types import AgentEvent
-from lab_harness.cli.usage import format_cost, format_tokens, prompt_tokens
-from lab_harness.config import Config, load_config
-from lab_harness.llm.types import Usage
+from pyharnx.agent.agent import Listener
+from pyharnx.agent.types import AgentEvent
+from pyharnx.cli.usage import format_cost, format_tokens, prompt_tokens
+from pyharnx.config import Config, load_config
+from pyharnx.llm.types import Usage
 from search_agent.run import Outcome, run_query
 from search_agent.settings import CONFIG_FILE, load_settings
 

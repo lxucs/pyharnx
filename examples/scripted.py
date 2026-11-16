@@ -11,11 +11,11 @@ offline.
 
 import asyncio
 
-from lab_harness.agent import Agent, AgentEvent
-from lab_harness.config import load_config
-from lab_harness.llm.fake import FAKE_MODEL, FakeProvider, text_response, tool_call_response
-from lab_harness.llm.types import AssistantMessage, ContentBlock, TextBlock, ToolCallBlock
-from lab_harness.tools import default_registry
+from pyharnx.agent import Agent, AgentEvent
+from pyharnx.config import load_config
+from pyharnx.llm.fake import FAKE_MODEL, FakeProvider, text_response, tool_call_response
+from pyharnx.llm.types import AssistantMessage, ContentBlock, TextBlock, ToolCallBlock
+from pyharnx.tools import default_registry
 
 SCRIPT = [
     tool_call_response(

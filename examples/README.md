@@ -1,6 +1,6 @@
 # Examples
 
-How to use lab-harness from the terminal and from Python. Run everything from
+How to use pyharnx from the terminal and from Python. Run everything from
 the repository root, after `uv sync`.
 
 | Example | Shows | Needs a key |
@@ -22,18 +22,18 @@ uv run python examples/quickstart.py "Where does the agent loop stop?"
 the current directory — but recording one does:
 
 ```bash
-uv run lab-harness -p "What does this project do?"            # record a session
+uv run pyharnx -p "What does this project do?"                # record a session
 uv run python examples/trajectories.py > requests.jsonl       # the latest one, a line per request
 uv run python examples/trajectories.py <session-id> --wire    # a given one, as the endpoint received it
 ```
 
-The Python examples take their model from config — `$LAB_HARNESS_MODEL`, else
+The Python examples take their model from config — `$PYHARNX_MODEL`, else
 `agent.model` — so one script runs against any configured vendor, given its
 key:
 
 ```bash
 export DEEPSEEK_API_KEY=sk-...
-LAB_HARNESS_MODEL=deepseek-flash uv run python examples/hooks.py
+PYHARNX_MODEL=deepseek-flash uv run python examples/hooks.py
 ```
 
 Each example is a single file, readable top to bottom, and each is run by

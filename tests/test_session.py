@@ -1,7 +1,7 @@
 """Session persistence: the transcript format, the store, and resume.
 
-`LAB_HARNESS_HOME` is redirected per test by an autouse fixture in conftest, so
-nothing here can touch a real `~/.lab-harness`.
+`PYHARNX_HOME` is redirected per test by an autouse fixture in conftest, so
+nothing here can touch a real `~/.pyharnx`.
 """
 
 import asyncio
@@ -12,11 +12,11 @@ from pathlib import Path
 
 import pytest
 
-from lab_harness.agent import Agent
-from lab_harness.agent.types import PrepareRequestContext, RequestUpdate, declarations_for
-from lab_harness.config import REDACTED, Config, SessionConfig, TavilyConfig, snapshot
-from lab_harness.llm.fake import FAKE_MODEL, FakeProvider, text_response, tool_call_response
-from lab_harness.llm.types import (
+from pyharnx.agent import Agent
+from pyharnx.agent.types import PrepareRequestContext, RequestUpdate, declarations_for
+from pyharnx.config import REDACTED, Config, SessionConfig, TavilyConfig, snapshot
+from pyharnx.llm.fake import FAKE_MODEL, FakeProvider, text_response, tool_call_response
+from pyharnx.llm.types import (
     AssistantMessage,
     Message,
     TextBlock,
@@ -26,24 +26,24 @@ from lab_harness.llm.types import (
     UserMessage,
     text,
 )
-from lab_harness.session.recorder import SessionRecorder, start_recorder
-from lab_harness.session.resume import ResumeError, resume, trim_to_resumable
-from lab_harness.session.store import (
+from pyharnx.session.recorder import SessionRecorder, start_recorder
+from pyharnx.session.resume import ResumeError, resume, trim_to_resumable
+from pyharnx.session.store import (
     find_session,
     list_sessions,
     new_session_id,
     project_directory,
     project_slug,
 )
-from lab_harness.session.transcript import (
+from pyharnx.session.transcript import (
     SessionHeader,
     TranscriptError,
     TranscriptWriter,
     read_transcript,
     recorded_requests,
 )
-from lab_harness.tools import default_registry
-from lab_harness.tools.base import ExecutionMode, ToolContext, ToolResult
+from pyharnx.tools import default_registry
+from pyharnx.tools.base import ExecutionMode, ToolContext, ToolResult
 from tests.entries import profile_entry
 
 CONFIG = SessionConfig()
@@ -101,10 +101,10 @@ def test_same_named_directories_in_different_places_do_not_collide(tmp_path: Pat
 
 
 def test_slug_keeps_the_directory_name_readable(tmp_path: Path) -> None:
-    project = tmp_path / "lab-harness"
+    project = tmp_path / "pyharnx"
     project.mkdir()
 
-    assert project_slug(project).startswith("lab-harness-")
+    assert project_slug(project).startswith("pyharnx-")
 
 
 def test_home_honors_the_env_override(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

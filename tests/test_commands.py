@@ -12,7 +12,7 @@ from prompt_toolkit.input import PipeInput, create_pipe_input
 from prompt_toolkit.layout import ConditionalContainer, HSplit
 from prompt_toolkit.output import DummyOutput
 
-from lab_harness.cli.commands import Command, CommandMenu, Commands, UnknownCommand
+from pyharnx.cli.commands import Command, CommandMenu, Commands, UnknownCommand
 
 DOWN = "\x1b[B"
 UP = "\x1b[A"

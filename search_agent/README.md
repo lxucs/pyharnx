@@ -1,6 +1,6 @@
 # Search agent
 
-A search agent example built on [lab-harness](../README.md) — it answers a question by
+A search agent example built on [pyharnx](../README.md) — it answers a question by
 searching and reading a corpus of documents — and the repository's worked
 example of driving the harness from Python. The agent is a few lines; the model
 and the tool set are config; the transcript, the report and the numbers are the
@@ -16,7 +16,7 @@ uv run python -m search_agent --help
 ```
 
 **A real run is committed, if you would rather look than run:**
-[`runs/793/report.html`](https://lxucs.github.io/lab-harness/search_agent/runs/793/report.html) is the whole exchange on one
+[`runs/793/report.html`](https://lxucs.github.io/pyharnx/search_agent/runs/793/report.html) is the whole exchange on one
 page — turns, tool calls, token counts — beside the `trajectory.json` built
 from it and the transcript the harness wrote. Paths in it read `<project>` and
 `<home>`; that is this machine's, and it goes no further.
@@ -37,7 +37,7 @@ For each line of `data/queries.jsonl`, in order:
 
 | File | What |
 |---|---|
-| `<query-id>.jsonl` | The session transcript — the same file `lab-harness` writes for a terminal session |
+| `<query-id>.jsonl` | The session transcript — the same file `pyharnx` writes for a terminal session |
 | `report.html` | The HTML report built from it, the same page `--export` produces |
 | `trajectory.json` | The run as data: the query, the gold answer, the docids, the model and tools, the numbers, and every message |
 
@@ -50,7 +50,7 @@ re-run is a new run, not the second half of the last one.
 
 ## What it shows
 
-How little of a search agent is left to write once lab-harness is underneath
+How little of a search agent is left to write once pyharnx is underneath
 it — all of it in `run.py`:
 
 - `route(None, config)` — the model and provider, from config alone, so the

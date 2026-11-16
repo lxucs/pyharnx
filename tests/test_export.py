@@ -1,4 +1,4 @@
-"""The HTML session page: `lab-harness --export`.
+"""The HTML session page: `pyharnx --export`.
 
 Transcripts are written with the real `TranscriptWriter` and read back with
 `read_transcript`, so the page is built from exactly what a session leaves on
@@ -12,10 +12,10 @@ import re
 from dataclasses import replace
 from pathlib import Path
 
-from lab_harness.cli.export import export_html, render_html
-from lab_harness.config import Config, PricingConfig, snapshot
-from lab_harness.llm.fake import FAKE_MODEL
-from lab_harness.llm.types import (
+from pyharnx.cli.export import export_html, render_html
+from pyharnx.config import Config, PricingConfig, snapshot
+from pyharnx.llm.fake import FAKE_MODEL
+from pyharnx.llm.types import (
     AssistantMessage,
     ImageBlock,
     Message,
@@ -28,7 +28,7 @@ from lab_harness.llm.types import (
     UserMessage,
     text,
 )
-from lab_harness.session import SessionContext, SessionHeader, TranscriptWriter, read_transcript
+from pyharnx.session import SessionContext, SessionHeader, TranscriptWriter, read_transcript
 from tests.entries import model_entry
 
 TOOLS = (

@@ -23,11 +23,11 @@ from prompt_toolkit.input import create_pipe_input
 from prompt_toolkit.output import DummyOutput
 from rich.console import Console
 
-from lab_harness.agent import Agent
-from lab_harness.agent.types import AgentEvent, AgentStart, MessageStart
-from lab_harness.cli.commands import Command
-from lab_harness.cli.renderers import GLYPH, EventRenderer
-from lab_harness.cli.terminal import (
+from pyharnx.agent import Agent
+from pyharnx.agent.types import AgentEvent, AgentStart, MessageStart
+from pyharnx.cli.commands import Command
+from pyharnx.cli.renderers import GLYPH, EventRenderer
+from pyharnx.cli.terminal import (
     LogStream,
     Terminal,
     _bindings,
@@ -35,17 +35,17 @@ from lab_harness.cli.terminal import (
     _keys_wait_quietly,
     build_approval_gate,
 )
-from lab_harness.config import (
+from pyharnx.config import (
     Config,
     ConfigError,
     PricingConfig,
     SessionConfig,
     TerminalConfig,
     ThemeConfig,
-    lab_harness_home,
+    pyharnx_home,
 )
-from lab_harness.llm.fake import FAKE_MODEL, FakeProvider, text_response, tool_call_response
-from lab_harness.llm.types import (
+from pyharnx.llm.fake import FAKE_MODEL, FakeProvider, text_response, tool_call_response
+from pyharnx.llm.types import (
     AssistantMessage,
     TextBlock,
     ToolCallBlock,
@@ -53,9 +53,9 @@ from lab_harness.llm.types import (
     UserMessage,
     text,
 )
-from lab_harness.logs import configure_logging
-from lab_harness.session import SessionRecorder, start_recorder
-from lab_harness.tools.skills import skill
+from pyharnx.logs import configure_logging
+from pyharnx.session import SessionRecorder, start_recorder
+from pyharnx.tools.skills import skill
 from tests.entries import model_entry
 
 #: Stands in for a command list that is never up, so Alt-Enter keeps its newline.
@@ -68,12 +68,16 @@ class ScriptedSession:
     def __init__(self, lines: list[str | type[BaseException]]) -> None:
         self._lines = list(lines)
         self.prompts: list[object] = []
-        #: What the terminal asked to draw at the right of each input.
+        #: What was drawn at the right of each input. Like prompt_toolkit's
+        #: session, an `rprompt` of None keeps the last one rather than clearing it.
         self.rprompts: list[object] = []
+        self._rprompt: object = None
 
     async def prompt_async(self, message: object = "", *, rprompt: object = None) -> str:
         self.prompts.append(message)
-        self.rprompts.append(rprompt)
+        if rprompt is not None:
+            self._rprompt = rprompt
+        self.rprompts.append(self._rprompt)
         if not self._lines:
             raise EOFError
         item = self._lines.pop(0)
@@ -182,7 +186,7 @@ async def test_ctrl_c_during_a_run_cancels_the_turn_and_keeps_the_session() -> N
     """
     from pydantic import BaseModel
 
-    from lab_harness.tools.base import ToolContext, ToolResult, ok, tool
+    from pyharnx.tools.base import ToolContext, ToolResult, ok, tool
 
     class _P(BaseModel):
         pass
@@ -371,7 +375,7 @@ async def test_the_status_is_only_offered_at_the_input_prompt() -> None:
 
     rprompts = terminal._session.rprompts  # type: ignore[attr-defined]
     assert callable(rprompts[0]), "the input prompt carries one"
-    assert rprompts[-1] is None, "the question does not"
+    assert not rprompts[-1], "the question does not, nor keeps the last one"
 
 
 async def test_before_any_run_the_status_is_the_model_alone() -> None:
@@ -387,7 +391,7 @@ async def test_before_any_run_the_status_is_the_model_alone() -> None:
 
 async def test_typed_lines_are_kept_in_the_session_home() -> None:
     config = Config()
-    path = lab_harness_home(config.session) / config.session.history_file
+    path = pyharnx_home(config.session) / config.session.history_file
     with create_pipe_input() as pipe, create_app_session(input=pipe, output=DummyOutput()):
         console = Console(file=io.StringIO(), width=90, force_terminal=False, no_color=True)
         terminal = Terminal(console=console, config=config)
@@ -586,7 +590,7 @@ def _write_skill(
     tmp_path: Path, name: str = "commit", description: str = "Write one", body: str = "Do it."
 ) -> Path:
     """A skill in the working directory's own skills directory."""
-    directory = tmp_path / ".lab-harness" / "skills" / name
+    directory = tmp_path / ".pyharnx" / "skills" / name
     directory.mkdir(parents=True, exist_ok=True)
     (directory / "SKILL.md").write_text(
         f"---\ndescription: {description}\nallowed-tools: Bash\n---\n{body}\n", encoding="utf-8"
@@ -614,7 +618,7 @@ async def test_skills_says_where_it_looked_when_there_are_none(tmp_path: Path) -
 
     output = buffer.getvalue()
     assert "No skills in" in output
-    assert ".lab-harness/skills" in output
+    assert ".pyharnx/skills" in output
 
 
 async def test_a_skill_is_a_command_that_sends_its_instructions(tmp_path: Path) -> None:
@@ -669,7 +673,7 @@ async def test_a_skill_that_vanished_is_said(tmp_path: Path) -> None:
     _write_skill(tmp_path)
     terminal, buffer = _terminal(["/commit"])
     _attach(terminal, FakeProvider([]))
-    for path in (tmp_path / ".lab-harness").rglob("*"):
+    for path in (tmp_path / ".pyharnx").rglob("*"):
         if path.is_file():
             path.unlink()
 
@@ -867,10 +871,18 @@ async def test_escape_is_a_newline_except_where_it_closes_the_list() -> None:
         ("y", "yes"),
         ("yes", "yes"),
         ("Y", "yes"),
+        (" yes ", "yes"),
         ("n", "no"),
+        ("no", "no"),
         ("a", "always"),
+        ("always", "always"),
         ("maybe", "no"),
         ("q", "no"),
+        # Whole words only: a first letter is not an answer.
+        ("abort", "no"),
+        ("ask", "no"),
+        ("yeah", "no"),
+        ("nope", "no"),
     ],
 )
 async def test_approval_answers_map_as_documented(typed: str, expected: str) -> None:
@@ -901,7 +913,7 @@ async def test_ctrl_c_at_the_approval_question_cancels_the_turn(tmp_path) -> Non
     the user has walked out of, and to ask the same question for the next call
     in the batch.
     """
-    from lab_harness.tools import default_registry
+    from pyharnx.tools import default_registry
 
     config = Config()
     call = ToolCallBlock(id="c2", name="write", arguments={"path": "new.txt", "content": "x"})
@@ -970,7 +982,7 @@ async def test_the_question_is_asked_with_the_live_region_down() -> None:
 
 async def test_a_denied_tool_does_not_run_through_the_terminal(tmp_path) -> None:
     """End to end: terminal answer -> gate -> loop -> tool never executes."""
-    from lab_harness.tools import default_registry
+    from pyharnx.tools import default_registry
 
     config = Config()
     terminal, buffer = _terminal(["write a file", "n"], config)
@@ -992,7 +1004,7 @@ async def test_a_denied_tool_does_not_run_through_the_terminal(tmp_path) -> None
 
 
 async def test_an_approved_tool_runs_through_the_terminal(tmp_path) -> None:
-    from lab_harness.tools import default_registry
+    from pyharnx.tools import default_registry
 
     config = Config()
     terminal, _ = _terminal(["write a file", "y"], config)
@@ -1106,7 +1118,7 @@ async def test_a_run_keeps_keys_quiet_for_its_whole_length(monkeypatch) -> None:
 
     from pydantic import BaseModel
 
-    from lab_harness.tools.base import ToolContext, ToolResult, ok, tool
+    from pyharnx.tools.base import ToolContext, ToolResult, ok, tool
 
     class _P(BaseModel):
         pass
@@ -1123,7 +1135,7 @@ async def test_a_run_keeps_keys_quiet_for_its_whole_length(monkeypatch) -> None:
         echoing.append(bool(attributes[3] & termios.ECHO))
         return ok("probed")
 
-    monkeypatch.setattr("lab_harness.cli.terminal._stdin_fd", lambda: slave)
+    monkeypatch.setattr("pyharnx.cli.terminal._stdin_fd", lambda: slave)
     call = ToolCallBlock(id="c1", name="probe", arguments={})
     terminal, _ = _terminal(["go"])
     _attach(
@@ -1176,14 +1188,14 @@ async def test_a_log_record_prints_above_the_live_region_and_leaves_it_whole() -
 
     await renderer(AgentStart(system_prompt="", tools=(), model=FAKE_MODEL, history=0))
     try:
-        logging.getLogger("lab_harness.sample").debug("a record")
+        logging.getLogger("pyharnx.sample").debug("a record")
         await renderer(MessageStart(message=message))  # anything that redraws
         shown = [line for line in screen(out.getvalue()) if line]
     finally:
         renderer.close()
 
     assert len(shown) == 2, shown
-    assert shown[0] == "DEBUG lab_harness.sample: a record"
+    assert shown[0] == "DEBUG pyharnx.sample: a record"
     assert shown[1].endswith("Working… (0s · Ctrl-C to cancel)")
 
 
@@ -1191,9 +1203,9 @@ def test_a_log_record_is_printed_in_the_style_given() -> None:
     out = io.StringIO()
     console = Console(file=out, force_terminal=True, color_system="standard")
 
-    LogStream(console, "dim").write("DEBUG lab_harness.sample: quiet\n")
+    LogStream(console, "dim").write("DEBUG pyharnx.sample: quiet\n")
 
-    assert out.getvalue() == "\x1b[2mDEBUG lab_harness.sample: quiet\x1b[0m\n"
+    assert out.getvalue() == "\x1b[2mDEBUG pyharnx.sample: quiet\x1b[0m\n"
 
 
 async def test_tools_lists_what_the_session_has() -> None:

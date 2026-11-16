@@ -13,11 +13,11 @@ from pathlib import Path
 
 import pytest
 
-import lab_harness.tools.shell as shell_module
-from lab_harness.config import BashConfig, Config, ToolsConfig
-from lab_harness.llm.types import TextBlock
-from lab_harness.tools.base import ToolContext, ToolResult
-from lab_harness.tools.shell import _Collector, bash
+import pyharnx.tools.shell as shell_module
+from pyharnx.config import BashConfig, Config, ToolsConfig
+from pyharnx.llm.types import TextBlock
+from pyharnx.tools.base import ToolContext, ToolResult
+from pyharnx.tools.shell import _Collector, bash
 
 
 def _ctx(tmp_path: Path, config: Config | None = None, **kwargs: object) -> ToolContext:
@@ -189,6 +189,18 @@ async def test_a_slow_command_times_out_and_is_terminated(tmp_path: Path) -> Non
     assert result.is_error
     assert result.details["timed_out"] is True
     assert "timed out" in _text(result)
+
+
+async def test_the_grace_before_sigkill_comes_from_config(tmp_path: Path) -> None:
+    """A command that ignores SIGTERM is killed once the configured grace runs
+    out — not after a fixed two seconds."""
+    config = _with_bash(timeout_seconds=1, kill_grace_seconds=0.1)
+
+    start = time.monotonic()
+    result = await bash.execute({"command": "trap '' TERM; sleep 30"}, _ctx(tmp_path, config))
+
+    assert result.details["timed_out"] is True
+    assert time.monotonic() - start < 2.5
 
 
 async def test_output_before_a_timeout_is_still_returned(tmp_path: Path) -> None:

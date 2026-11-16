@@ -14,21 +14,21 @@ from types import ModuleType
 
 import pytest
 
-from lab_harness.agent import Agent
-from lab_harness.agent.types import declarations_for
-from lab_harness.config import load_config
-from lab_harness.llm.fake import (
+from pyharnx.agent import Agent
+from pyharnx.agent.types import declarations_for
+from pyharnx.config import load_config
+from pyharnx.llm.fake import (
     FAKE_MODEL,
     FakeProvider,
     error_response,
     text_response,
     tool_call_response,
 )
-from lab_harness.llm.providers import ChatCompletionsProvider, route
-from lab_harness.llm.serde import to_dict
-from lab_harness.llm.types import Message, TextBlock, ToolCallBlock, ToolResultMessage, UserMessage
-from lab_harness.session import start_recorder
-from lab_harness.tools import ToolContext, default_registry
+from pyharnx.llm.providers import ChatCompletionsProvider, route
+from pyharnx.llm.serde import to_dict
+from pyharnx.llm.types import Message, TextBlock, ToolCallBlock, ToolResultMessage, UserMessage
+from pyharnx.session import start_recorder
+from pyharnx.tools import ToolContext, default_registry
 from tests.http_fakes import TEST_KEY, Scripted
 
 EXAMPLES = Path(__file__).resolve().parent.parent / "examples"

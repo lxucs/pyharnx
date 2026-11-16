@@ -9,7 +9,7 @@ from dataclasses import replace
 
 import pytest
 
-from lab_harness.config import (
+from pyharnx.config import (
     AgentConfig,
     Config,
     ConfigError,
@@ -17,16 +17,16 @@ from lab_harness.config import (
     OpenAIConfig,
     ProvidersConfig,
 )
-from lab_harness.llm.providers import (
+from pyharnx.llm.providers import (
     PROTOCOLS,
     build_protocol,
     build_provider,
     route,
     select_provider,
 )
-from lab_harness.llm.providers.anthropic import AnthropicProvider
-from lab_harness.llm.providers.chat_completions import ChatCompletionsProvider
-from lab_harness.llm.providers.responses import ResponsesProvider
+from pyharnx.llm.providers.anthropic import AnthropicProvider
+from pyharnx.llm.providers.chat_completions import ChatCompletionsProvider
+from pyharnx.llm.providers.responses import ResponsesProvider
 from tests.entries import model_entry, profile_entry
 
 

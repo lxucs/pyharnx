@@ -4,15 +4,18 @@
 
 > A provider **must not raise** for request, model, or runtime failures.
 > Failures terminate the stream with an `error` event carrying an
-> `AssistantMessage` with `stop_reason="error"` and `error_message`.
+> `AssistantMessage` with `stop_reason="error"` (`"aborted"` for a cancelled
+> request) and `error_message`.
 
 This is lifted from pi verbatim, and it is why the agent loop has very few
 try/excepts. Honor it when adding a provider.
 
 ```python
 class Provider(Protocol):
-    async def stream(
-        self, model: Model, ctx: Context, opts: StreamOptions
+    name: str
+
+    def stream(
+        self, model: Model, ctx: Context, opts: StreamOptions | None = None
     ) -> AsyncIterator[StreamEvent]: ...
 ```
 
@@ -137,7 +140,7 @@ request's history. That is how a session's requests are rebuilt
 
 ## The Anthropic adapter
 
-`lab_harness/llm/providers/anthropic.py`. Credentials come from the environment,
+`pyharnx/llm/providers/anthropic.py`. Credentials come from the environment,
 never from a config file or a constructor argument; config holds only the env
 var *names*.
 
@@ -304,7 +307,7 @@ default.
 
 ## The Chat Completions adapter
 
-`lab_harness/llm/providers/chat_completions.py`. Raw `httpx` rather than the
+`pyharnx/llm/providers/chat_completions.py`. Raw `httpx` rather than the
 `openai` SDK: httpx is already a dependency for the web tools, the SSE framing
 is forty lines, and `reasoning_content` sits outside the SDK's types anyway.
 
@@ -330,7 +333,7 @@ Reasoning deltas are read from `reasoning_content` (DeepSeek's name) or
 ### Replies that are not streamed
 
 `stream = false` on a profile asks for the whole reply in one response.
-`lab_harness/llm/providers/_single.py` replays it as the stream the loop
+`pyharnx/llm/providers/_single.py` replays it as the stream the loop
 expects: a single chunk in delta shape, fed to the same accumulator, then the
 end events the streaming path emits. The translation is shared, so tool-call
 assembly, the reasoning fields, usage and the finish-reason mapping cannot
@@ -359,7 +362,7 @@ is what the server actually received. See
 
 ## The Responses adapter
 
-`lab_harness/llm/providers/responses.py`. Opt in with `api = "responses"`.
+`pyharnx/llm/providers/responses.py`. Opt in with `api = "responses"`.
 
 Not a tweak of Chat Completions — a different shape:
 
@@ -406,7 +409,7 @@ provider = "groq"
 `api` picks the protocol: `chat_completions` (default, since that is what a new
 vendor almost certainly speaks) or `responses`. The shipped `openai` profile —
 like every shipped endpoint, in
-[`lab_harness/llm/catalog.toml`](../lab_harness/llm/catalog.toml) — sets
+[`pyharnx/llm/catalog.toml`](../pyharnx/llm/catalog.toml) — sets
 `responses`; `deepseek` and `glm` use the default. An unusable value fails at
 startup naming the profile.
 
@@ -445,7 +448,7 @@ gateway, or at a local server running the same weights, is one line:
 `[models.claude-sonnet-5] provider = "my-gateway"`.
 
 `select_provider`, `build_provider` and `route` live in
-`lab_harness/llm/providers/__init__.py`. `route` is the one the CLI calls; it
+`pyharnx/llm/providers/__init__.py`. `route` is the one the CLI calls; it
 resolves the id, picks the provider, and writes it onto `Model.provider` — an
 uncatalogued id resolves naming none, and `--provider` can override the one a
 catalogued id names.
@@ -455,8 +458,8 @@ A profile's credential resolves from the environment first, then
 
 ## The model catalog
 
-Every LLM setting lab-harness ships is data rather than code:
-[`lab_harness/llm/catalog.toml`](../lab_harness/llm/catalog.toml) holds
+Every LLM setting pyharnx ships is data rather than code:
+[`pyharnx/llm/catalog.toml`](../pyharnx/llm/catalog.toml) holds
 Claude's adapter settings, the endpoints, every model, and in `[defaults]` what
 an endpoint or a model gets for a key it leaves out. It is the default of the
 `providers` and `models` config sections and uses their format exactly, so a
@@ -465,8 +468,8 @@ config file adds a model or a vendor, or changes one, with the same tables. One
 limits and flags, its price; the keys are in
 [configuration.md](configuration.md#models).
 
-`resolve_model()` in `lab_harness/llm/registry.py` turns an id into the `Model`
-the adapters read. Precedence: explicit argument, then `LAB_HARNESS_MODEL`,
+`resolve_model()` in `pyharnx/llm/registry.py` turns an id into the `Model`
+the adapters read. Precedence: explicit argument, then `PYHARNX_MODEL`,
 then the configured default.
 
 An **unknown model id is not an error**. Model names ship faster than this
@@ -504,7 +507,7 @@ api_key_env = "MYVENDOR_API_KEY"
 provider = "myvendor"
 ```
 
-`lab-harness --model their-model-v1` now routes there. Add its real limits,
+`pyharnx --model their-model-v1` now routes there. Add its real limits,
 capability flags and price to the same `[models]` table if you have them —
 [configuration.md](configuration.md#models) lists the keys. For a
 reasoning model, check the vendor's docs on sending reasoning back before

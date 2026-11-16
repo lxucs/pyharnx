@@ -1,13 +1,15 @@
-# lab-harness Documentation
+# pyharnx Documentation
 
-A minimal agent harness in Python, built for research — every request
+A minimal agent harness in Python, built for experiments — every request
 reproducible from its transcript, one loop across Claude, OpenAI, DeepSeek and
-GLM, every step a typed event. Modeled on
-[pi](https://github.com/earendil-works/pi). The [README](../README.md) has the
-pitch and a quick start, [examples/](../examples/) has runnable usage from the
-terminal and from Python, [`search_agent/`](../search_agent/) is a complete
-program built on the harness with a committed run to read, and these pages
-have the details.
+GLM, every step a typed event. A lightweight Python alternative to
+[pi](https://github.com/earendil-works/pi); where it departs from pi is in
+[architecture.md](architecture.md#relationship-to-pi).
+
+The [README](../README.md) has the pitch and a quick start,
+[examples/](../examples/) has runnable usage from the terminal and from Python,
+[`search_agent/`](../search_agent/) is a complete program built on the harness
+with a committed run to read, and these pages have the details.
 
 ## Reading order
 

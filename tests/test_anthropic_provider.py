@@ -23,8 +23,8 @@ from anthropic.types import (
     RawMessageStopEvent,
 )
 
-from lab_harness.config import Config
-from lab_harness.llm.events import (
+from pyharnx.config import Config
+from pyharnx.llm.events import (
     StreamDone,
     StreamError,
     StreamStart,
@@ -34,10 +34,10 @@ from lab_harness.llm.events import (
     ToolCallDelta,
     ToolCallEnd,
 )
-from lab_harness.llm.provider import StreamOptions
-from lab_harness.llm.providers.anthropic import AnthropicProvider
-from lab_harness.llm.registry import resolve_model
-from lab_harness.llm.types import (
+from pyharnx.llm.provider import StreamOptions
+from pyharnx.llm.providers.anthropic import AnthropicProvider
+from pyharnx.llm.registry import resolve_model
+from pyharnx.llm.types import (
     AssistantMessage,
     Context,
     ProviderBlock,
@@ -759,7 +759,7 @@ async def test_the_log_names_the_response_and_its_stop_reason_as_sent(
     """Refusal maps to "stop", so the log is where the real reason survives."""
     provider = _provider([_msg_start(), _msg_delta("refusal")])
 
-    with caplog.at_level(logging.DEBUG, logger="lab_harness.llm.providers.anthropic"):
+    with caplog.at_level(logging.DEBUG, logger="pyharnx.llm.providers.anthropic"):
         await _collect(provider, _ctx())
 
     assert (

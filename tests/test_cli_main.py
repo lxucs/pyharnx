@@ -16,9 +16,9 @@ from pathlib import Path
 import pytest
 from rich.console import Console
 
-from lab_harness.agent import Agent
-from lab_harness.cli.approval import ApprovalGate
-from lab_harness.cli.main import (
+from pyharnx.agent import Agent
+from pyharnx.cli.approval import ApprovalGate
+from pyharnx.cli.main import (
     _attach_session,
     _brief,
     _build_agent,
@@ -28,8 +28,8 @@ from lab_harness.cli.main import (
     main,
     run_interactive,
 )
-from lab_harness.cli.terminal import LogStream
-from lab_harness.config import (
+from pyharnx.cli.terminal import LogStream
+from pyharnx.config import (
     CONFIG_FILE,
     PROJECT_DIRECTORY,
     AgentConfig,
@@ -43,13 +43,13 @@ from lab_harness.config import (
     load_config,
     snapshot,
 )
-from lab_harness.llm.fake import FAKE_MODEL, FakeProvider, text_response
-from lab_harness.llm.providers.chat_completions import ChatCompletionsProvider
-from lab_harness.llm.registry import resolve_model
-from lab_harness.logs import ROOT_LOGGER
-from lab_harness.prompts import build_system_prompt, detect_environment
-from lab_harness.session import list_sessions, read_transcript, recorded_requests
-from lab_harness.tools import default_registry
+from pyharnx.llm.fake import FAKE_MODEL, FakeProvider, text_response
+from pyharnx.llm.providers.chat_completions import ChatCompletionsProvider
+from pyharnx.llm.registry import resolve_model
+from pyharnx.logs import ROOT_LOGGER
+from pyharnx.prompts import build_system_prompt, detect_environment
+from pyharnx.session import list_sessions, read_transcript, recorded_requests
+from pyharnx.tools import default_registry
 
 
 def _args(**kwargs: object) -> argparse.Namespace:
@@ -66,7 +66,7 @@ def _args(**kwargs: object) -> argparse.Namespace:
         "system_prompt_file": None,
         "yes": False,
         "resume": None,
-        # Tests must never write to the real ~/.lab-harness.
+        # Tests must never write to the real ~/.pyharnx.
         "no_save": True,
     }
     return argparse.Namespace(**{**defaults, **kwargs})
@@ -194,7 +194,7 @@ def test_an_unknown_tool_is_reported_without_a_traceback(
 
 
 def test_the_tools_and_their_source_are_logged(caplog: pytest.LogCaptureFixture) -> None:
-    with caplog.at_level(logging.INFO, logger="lab_harness.cli.main"):
+    with caplog.at_level(logging.INFO, logger="pyharnx.cli.main"):
         _build_agent(_args(tools=("read", "ls")), Config())
         _build_agent(_args(tools=()), Config())
 
@@ -267,7 +267,7 @@ def test_no_project_file_means_the_configured_sections(tmp_path: Path) -> None:
 
 def test_the_skills_found_are_named(tmp_path: Path) -> None:
     """Like project instructions: what is offered silently looks broken."""
-    directory = tmp_path / ".lab-harness" / "skills" / "commit"
+    directory = tmp_path / ".pyharnx" / "skills" / "commit"
     directory.mkdir(parents=True)
     (directory / "SKILL.md").write_text(
         "---\ndescription: Write a commit message\n---\nDo it.\n", encoding="utf-8"
@@ -281,7 +281,7 @@ def test_the_skills_found_are_named(tmp_path: Path) -> None:
 
 def test_skills_are_listed_only_if_this_run_can_load_one(tmp_path: Path) -> None:
     """A list of skills the model has no way to ask for is a promise unkept."""
-    directory = tmp_path / ".lab-harness" / "skills" / "commit"
+    directory = tmp_path / ".pyharnx" / "skills" / "commit"
     directory.mkdir(parents=True)
     (directory / "SKILL.md").write_text(
         "---\ndescription: Write a commit message\n---\nDo it.\n", encoding="utf-8"
@@ -307,7 +307,7 @@ def test_the_environment_is_filled_from_cwd_and_the_model(tmp_path: Path) -> Non
 def test_project_instructions_are_read_from_cwd_not_the_process_directory(
     tmp_path: Path,
 ) -> None:
-    """`lab-harness --cwd other/` must pick up *that* project's conventions."""
+    """`pyharnx --cwd other/` must pick up *that* project's conventions."""
     elsewhere = tmp_path / "other"
     elsewhere.mkdir()
     (elsewhere / "HARNESS.md").write_text("Conventions of the other project.")
@@ -412,7 +412,7 @@ def test_an_unusable_prompt_file_is_reported_without_a_traceback(
 def test_the_prompt_source_is_logged(
     caplog: pytest.LogCaptureFixture, args: argparse.Namespace, source: str
 ) -> None:
-    with caplog.at_level(logging.INFO, logger="lab_harness.cli.main"):
+    with caplog.at_level(logging.INFO, logger="pyharnx.cli.main"):
         _build_agent(args, Config())
 
     assert any(m.startswith(f"System prompt from {source} (") for m in caplog.messages)
@@ -429,7 +429,7 @@ async def test_interactive_attaches_an_approval_gate(monkeypatch: pytest.MonkeyP
             super().__init__(captured)
             self.config = config
 
-    monkeypatch.setattr("lab_harness.cli.main.Terminal", _FakeTerminal)
+    monkeypatch.setattr("pyharnx.cli.main.Terminal", _FakeTerminal)
 
     code = await run_interactive(_args(), Config())
 
@@ -445,7 +445,7 @@ async def test_yes_disables_the_gate(monkeypatch: pytest.MonkeyPatch) -> None:
         def __init__(self, console: object, config: Config) -> None:
             super().__init__(captured)
 
-    monkeypatch.setattr("lab_harness.cli.main.Terminal", _FakeTerminal)
+    monkeypatch.setattr("pyharnx.cli.main.Terminal", _FakeTerminal)
 
     await run_interactive(_args(yes=True), Config())
 
@@ -459,7 +459,7 @@ async def test_the_gate_guards_the_configured_tools(monkeypatch: pytest.MonkeyPa
         def __init__(self, console: object, config: Config) -> None:
             super().__init__(captured)
 
-    monkeypatch.setattr("lab_harness.cli.main.Terminal", _FakeTerminal)
+    monkeypatch.setattr("pyharnx.cli.main.Terminal", _FakeTerminal)
     config = Config(tools=ToolsConfig(approval=ApprovalConfig(required=("bash",))))
 
     await run_interactive(_args(), config)
@@ -480,7 +480,7 @@ async def test_the_terminal_is_handed_the_transcript_to_export(
             super().__init__({})
             terminals.append(self)
 
-    monkeypatch.setattr("lab_harness.cli.main.Terminal", _FakeTerminal)
+    monkeypatch.setattr("pyharnx.cli.main.Terminal", _FakeTerminal)
 
     await run_interactive(_args(no_save=False, cwd=str(tmp_path)), Config())
 
@@ -494,7 +494,7 @@ def test_interactive_resume_shows_the_restored_history(
     """`--resume` replays the saved conversation, so the session continues
     where the eye left off rather than from a one-line note."""
     provider = FakeProvider([text_response("first answer")])
-    monkeypatch.setattr("lab_harness.cli.main.route", lambda *_: (FAKE_MODEL, provider))
+    monkeypatch.setattr("pyharnx.cli.main.route", lambda *_: (FAKE_MODEL, provider))
     assert main(["-p", "first", "--cwd", str(tmp_path)]) == 0
     [path] = list_sessions(tmp_path, Config().session)
 
@@ -513,7 +513,7 @@ def test_interactive_resume_shows_the_restored_history(
             super().__init__(captured)
             terminal["constructed"] = True
 
-    monkeypatch.setattr("lab_harness.cli.main.Terminal", _FakeTerminal)
+    monkeypatch.setattr("pyharnx.cli.main.Terminal", _FakeTerminal)
 
     assert asyncio.run(run_interactive(_args(resume=path.stem, cwd=str(tmp_path)), Config())) == 0
 
@@ -561,10 +561,10 @@ def test_debug_covers_the_loading_of_config_itself(
     A level set in a config file cannot report that same file being read, so
     the flag and the env var have to take effect first.
     """
-    project = tmp_path / ".lab-harness"
+    project = tmp_path / ".pyharnx"
     project.mkdir()
     (project / "config.toml").write_text("[agent]\nmax_turns = 9\n")
-    monkeypatch.setenv("LAB_HARNESS_LOG_LEVEL", "debug")
+    monkeypatch.setenv("PYHARNX_LOG_LEVEL", "debug")
 
     main(["--resume", "--cwd", str(tmp_path)])
 
@@ -575,7 +575,7 @@ def test_a_config_file_can_set_the_level(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """What the second configure_logging call buys."""
-    project = tmp_path / ".lab-harness"
+    project = tmp_path / ".pyharnx"
     project.mkdir()
     (project / "config.toml").write_text('[logging]\nlevel = "debug"\n')
 
@@ -586,7 +586,7 @@ def test_a_config_file_can_set_the_level(
 
 
 def test_the_flag_beats_a_config_file(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    project = tmp_path / ".lab-harness"
+    project = tmp_path / ".pyharnx"
     project.mkdir()
     (project / "config.toml").write_text('[logging]\nlevel = "debug"\n')
 
@@ -600,7 +600,7 @@ def test_logs_go_to_stderr_not_stdout(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """stdout carries the answer and the JSONL stream; a log line would corrupt both."""
-    monkeypatch.setenv("LAB_HARNESS_LOG_LEVEL", "debug")
+    monkeypatch.setenv("PYHARNX_LOG_LEVEL", "debug")
 
     main(["--resume", "--cwd", str(tmp_path)])
 
@@ -613,7 +613,7 @@ def test_an_unusable_level_in_a_config_file_is_a_startup_error(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """Same contract as any other bad config value: fail, do not guess."""
-    project = tmp_path / ".lab-harness"
+    project = tmp_path / ".pyharnx"
     project.mkdir()
     (project / "config.toml").write_text('[logging]\nlevel = "loud"\n')
 
@@ -654,13 +654,13 @@ def test_an_unknown_provider_is_a_startup_error(
 def test_a_pipe_whose_reader_went_away_exits_quietly(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """`lab-harness | head`: the output is gone, but not with a traceback.
+    """`pyharnx | head`: the output is gone, but not with a traceback.
 
     Python's own flush at shutdown reports the closed pipe a second time, so
     stdout is pointed at /dev/null on the way out.
     """
     provider = FakeProvider([text_response("one")])
-    monkeypatch.setattr("lab_harness.cli.main.route", lambda *_: (FAKE_MODEL, provider))
+    monkeypatch.setattr("pyharnx.cli.main.route", lambda *_: (FAKE_MODEL, provider))
     broken = io.StringIO()
 
     def closed(*_: object) -> object:
@@ -680,7 +680,7 @@ def test_a_saved_session_rebuilds_every_request_the_cli_sent(
     enough to rebuild each request — project instructions, tools and all —
     across a `--resume`."""
     provider = FakeProvider([text_response("one"), text_response("two")])
-    monkeypatch.setattr("lab_harness.cli.main.route", lambda *_: (FAKE_MODEL, provider))
+    monkeypatch.setattr("pyharnx.cli.main.route", lambda *_: (FAKE_MODEL, provider))
     (tmp_path / "AGENTS.md").write_text("Indent with tabs.")
 
     assert main(["-p", "first", "--cwd", str(tmp_path)]) == 0
@@ -699,7 +699,7 @@ def test_resume_warns_when_the_project_instructions_changed(
 ) -> None:
     """Editing AGENTS.md changes the system prompt, which resume should say."""
     provider = FakeProvider([text_response("one")])
-    monkeypatch.setattr("lab_harness.cli.main.route", lambda *_: (FAKE_MODEL, provider))
+    monkeypatch.setattr("pyharnx.cli.main.route", lambda *_: (FAKE_MODEL, provider))
     (tmp_path / "AGENTS.md").write_text("Indent with tabs.")
     assert main(["-p", "first", "--cwd", str(tmp_path)]) == 0
     (tmp_path / "AGENTS.md").write_text("Indent with spaces.")
@@ -717,7 +717,7 @@ def test_one_shot_resume_warnings_go_to_stderr(
 ) -> None:
     """`-p` has no terminal to print them in, and must not mix them into the answer."""
     provider = FakeProvider([text_response("one"), text_response("two")])
-    monkeypatch.setattr("lab_harness.cli.main.route", lambda *_: (FAKE_MODEL, provider))
+    monkeypatch.setattr("pyharnx.cli.main.route", lambda *_: (FAKE_MODEL, provider))
     (tmp_path / "AGENTS.md").write_text("Indent with tabs.")
     assert main(["-p", "first", "--cwd", str(tmp_path)]) == 0
     (tmp_path / "AGENTS.md").write_text("Indent with spaces.")
@@ -736,7 +736,7 @@ def test_resume_without_an_id_lists_the_sessions_and_runs_nothing(
 ) -> None:
     """Continuing a conversation takes its id, so the bare flag shows which ids exist."""
     provider = FakeProvider([text_response("one"), text_response("two")])
-    monkeypatch.setattr("lab_harness.cli.main.route", lambda *_: (FAKE_MODEL, provider))
+    monkeypatch.setattr("pyharnx.cli.main.route", lambda *_: (FAKE_MODEL, provider))
     assert main(["-p", "first", "--cwd", str(tmp_path)]) == 0
     assert main(["-p", "second", "--cwd", str(tmp_path)]) == 0
     capsys.readouterr()
@@ -756,7 +756,7 @@ def test_resume_without_an_id_dates_each_session_in_local_time(
 ) -> None:
     """The file holds UTC and ISO; the menu answers "which one was this morning"."""
     provider = FakeProvider([text_response("one")])
-    monkeypatch.setattr("lab_harness.cli.main.route", lambda *_: (FAKE_MODEL, provider))
+    monkeypatch.setattr("pyharnx.cli.main.route", lambda *_: (FAKE_MODEL, provider))
     assert main(["-p", "first", "--cwd", str(tmp_path)]) == 0
     capsys.readouterr()
 
@@ -795,8 +795,8 @@ async def _interactive(monkeypatch: pytest.MonkeyPatch, *, stderr: StringIO) -> 
         def __init__(self, console: object, config: Config) -> None:
             super().__init__({})
 
-    monkeypatch.setattr("lab_harness.cli.main.Terminal", _FakeTerminal)
-    monkeypatch.setattr("lab_harness.cli.main.Console", lambda: Console(file=_Tty()))
+    monkeypatch.setattr("pyharnx.cli.main.Terminal", _FakeTerminal)
+    monkeypatch.setattr("pyharnx.cli.main.Console", lambda: Console(file=_Tty()))
     monkeypatch.setattr(sys, "stderr", stderr)
     await run_interactive(_args(log_level=None), Config())
 
@@ -811,7 +811,7 @@ async def test_records_go_through_the_console_when_stderr_is_its_terminal(
 
 
 async def test_a_redirected_stderr_keeps_the_records(monkeypatch: pytest.MonkeyPatch) -> None:
-    """`lab-harness 2> debug.log` is how to keep a trace out of the conversation."""
+    """`pyharnx 2> debug.log` is how to keep a trace out of the conversation."""
     await _interactive(monkeypatch, stderr=StringIO())
 
     assert not any(isinstance(s, LogStream) for s in _streams())
@@ -824,7 +824,7 @@ def test_export_writes_the_latest_session_as_a_page(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     provider = FakeProvider([text_response("the answer")])
-    monkeypatch.setattr("lab_harness.cli.main.route", lambda *_: (FAKE_MODEL, provider))
+    monkeypatch.setattr("pyharnx.cli.main.route", lambda *_: (FAKE_MODEL, provider))
     assert main(["-p", "the question", "--cwd", str(tmp_path)]) == 0
     [path] = list_sessions(tmp_path, Config().session)
     capsys.readouterr()
@@ -846,7 +846,7 @@ def test_export_of_an_unknown_session_is_an_error(
 
 def test_only_the_selected_skills_are_listed(tmp_path: Path) -> None:
     for name in ("commit", "release"):
-        directory = tmp_path / ".lab-harness" / "skills" / name
+        directory = tmp_path / ".pyharnx" / "skills" / name
         directory.mkdir(parents=True)
         (directory / "SKILL.md").write_text(
             f"---\ndescription: {name} things\n---\nDo it.\n", encoding="utf-8"

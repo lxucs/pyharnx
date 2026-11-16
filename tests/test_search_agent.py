@@ -11,10 +11,10 @@ from pathlib import Path
 
 import pytest
 
-from lab_harness.config import load_config
-from lab_harness.llm.fake import FAKE_MODEL, FakeProvider, text_response, tool_call_response
-from lab_harness.llm.types import TextBlock, ToolCallBlock
-from lab_harness.tools import ToolContext, ToolResult
+from pyharnx.config import load_config
+from pyharnx.llm.fake import FAKE_MODEL, FakeProvider, text_response, tool_call_response
+from pyharnx.llm.types import TextBlock, ToolCallBlock
+from pyharnx.tools import ToolContext, ToolResult
 from search_agent import cli
 from search_agent import run as program
 from search_agent.settings import Settings, load_settings

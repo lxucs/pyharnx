@@ -2,23 +2,31 @@
 
 ## Layering
 
-Three layers, as subpackages of one installable `lab_harness` package.
+Three layers, as subpackages of one installable `pyharnx` package.
 Dependencies point strictly downward.
 
 ```
-         cli/          terminal, json sink  (subscribers)
+         cli/                 terminal, json sink   (subscribers)
           │
-          ├─────────────────┐
-          ▼                 ▼
-        agent/            prompts/     the system prompt
+          ▼
+       session/               transcripts           (a subscriber too)
           │
-    ┌─────┼─────┐
-    ▼     ▼     ▼
-  llm/  tools/  session/
-    └─────┴─────┴──→  config.py, logs.py   (leaf modules)
+          ▼
+        agent/   prompts/     the loop · the system prompt
+          │
+          ▼
+        tools/                built-ins, the registry
+          │
+          ▼
+         llm/                 providers, messages, streaming
+          └──→  config.py, logs.py   (leaf modules, read by every layer)
 ```
 
-`llm/` imports from no other *layer*. It does read `lab_harness.config` — every
+Each box imports only from the boxes below it — `cli/` from any of them,
+`prompts/` from none. `tests/test_layering.py` reads every import in the
+package and fails on one that points up.
+
+`llm/` imports from no other *layer*. It does read `pyharnx.config` — every
 layer does. The leaf modules import nothing from the package except each other,
 so depending on one cannot create a cycle and does not make a layer less
 replaceable. Treat "no upward dependencies" as being about the boxes, not about
@@ -32,7 +40,7 @@ filesystem layout. A Python caller builds the prompt the same way.
 `logs.py` decides where diagnostics go and how loud they are. Every layer takes
 a logger the ordinary way (`logging.getLogger(__name__)`) and emits records
 unconditionally; only `cli/` calls `configure_logging`. That is the stdlib's
-library/application split, and it is why importing `lab_harness` installs no
+library/application split, and it is why importing `pyharnx` installs no
 handler on an embedding application's root logger — and why the module is
 `logs.py` rather than `logging.py`, which a reader would have to think about
 before trusting any `import logging` in the package. The interactive terminal
@@ -66,7 +74,9 @@ string; nothing but `cli/` and a Python caller imports it.
 **`session/`** — the append-only transcript on disk, and the reader that
 rebuilds every request from it. The recorder is a *subscriber*, so persistence
 is wiring rather than a branch in the loop: `cli/` decides whether to attach
-one, and hands it the prompt, tools and config to record.
+one, and hands it the prompt, tools and config to record. That is why it sits
+above `agent/`, not below: it reads `agent/`'s event types, and `agent/` never
+imports it — deleting it leaves the runtime working, as deleting `cli/` does.
 
 **`cli/`** — a *subscriber* to the agent's event stream. The runtime never
 imports from `cli/`. Deleting `cli/` leaves the runtime working. A resumed
@@ -93,15 +103,22 @@ This works only if events stay plain data — see [events.md](events.md).
 
 ### 2. The hooks
 
-| Hook | When | Used by |
+| Hook | When | What it is for |
 |---|---|---|
-| `before_tool_call` | after args validate, before execute | approval gate (`cli/approval.py`) |
-| `after_tool_call` | after execute, before events emit | truncation, redaction — of `content` and `details` both |
+| `before_tool_call` | after args validate, before execute | the approval gate (`cli/approval.py`) |
+| `after_tool_call` | after execute, before events emit | rewriting a result, `content` and `details` both — redaction in `examples/hooks.py`; none built in |
 | `prepare_request` | before every provider request | compaction (TODO) |
-| `finish_turn` | when a turn would cleanly end the run | auto-continue |
+| `finish_turn` | when a turn would cleanly end the run | auto-continue — a self-check in `examples/hooks.py`; none built in |
 
 Hooks are optional async callables. A feature that fits a hook does not belong
 in the loop.
+
+**A hook that raises never escapes the run**, and each fails toward the safe
+side: a failing `before_tool_call` denies the call, a failing `after_tool_call`
+replaces the result with an error rather than pass on what it was meant to
+review, and a failing `prepare_request` ends the run on an `error` message
+without sending anything — the history unchanged may be what it was there to
+stop, too long to fit or holding what it redacts.
 
 **`finish_turn`** returns `FinishTurnResult(continue_with=…)` to append a user
 message and keep going, or `None` to let the run end. Three properties make it
@@ -131,14 +148,14 @@ and tool declarations as system messages inside the transcript, replaying them
 to derive current state. We pass `Context(system_prompt, messages, tools)` to
 the provider directly, and the session writes them down as a `context` entry —
 a record, never read back into the agent. Each run's `agent_start` event
-carries all three, so the recorder writes a new entry whenever one changes
-between runs, and a `prepare_request` hook's rewrite of a single request is an
+carries the system prompt, tools and model, so the recorder writes a new entry
+whenever one changes between runs, and a `prepare_request` hook's rewrite of a single request is an
 event and an entry of its own. That keeps enough to rebuild every request (see
 [sessions.md](sessions.md#trajectories)) while the core stays several hundred
 lines smaller.
 
 **Prompts are data.** The system prompt pi assembles in code is
-`lab_harness/prompts/prompts.toml` here, the default of the `[prompts]` config
+`pyharnx/prompts/prompts.toml` here, the default of the `[prompts]` config
 section; code only fills in the variables and joins the sections, in
 `prompts/system.py`. It names no tools: the declarations alone tell the model
 what it can call, so the prompt stays true for any tool set.

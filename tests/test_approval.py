@@ -9,14 +9,14 @@ import pytest
 from pydantic import BaseModel
 from rich.console import Console
 
-from lab_harness.agent import Agent
-from lab_harness.agent.types import BeforeToolCallContext, EventSink, ToolExecutionEnd
-from lab_harness.cli.approval import DENIED_NOTICE, ApprovalGate, skill_allowances
-from lab_harness.config import ApprovalConfig, Config
-from lab_harness.llm.fake import FAKE_MODEL, FakeProvider, text_response, tool_call_response
-from lab_harness.llm.types import TextBlock, ToolCallBlock, UserMessage, text
-from lab_harness.tools.base import ToolContext, ToolResult, ok, tool
-from lab_harness.tools.skills import skill
+from pyharnx.agent import Agent
+from pyharnx.agent.types import BeforeToolCallContext, EventSink, ToolExecutionEnd
+from pyharnx.cli.approval import DENIED_NOTICE, ApprovalGate, skill_allowances
+from pyharnx.config import ApprovalConfig, Config
+from pyharnx.llm.fake import FAKE_MODEL, FakeProvider, text_response, tool_call_response
+from pyharnx.llm.types import TextBlock, ToolCallBlock, UserMessage, text
+from pyharnx.tools.base import ToolContext, ToolResult, ok, tool
+from pyharnx.tools.skills import skill
 
 
 class _Params(BaseModel):
@@ -235,7 +235,7 @@ async def test_the_default_required_set_covers_the_mutating_tools() -> None:
 async def test_each_answer_is_logged_against_its_call(caplog: pytest.LogCaptureFixture) -> None:
     gate, _ = _gate(["always"])
 
-    with caplog.at_level(logging.DEBUG, logger="lab_harness.cli.approval"):
+    with caplog.at_level(logging.DEBUG, logger="pyharnx.cli.approval"):
         await gate(_ctx("dangerous"))
 
     assert "Tool call c1: approval answered 'always'" in caplog.text
@@ -303,7 +303,7 @@ async def test_remembering_off_suppresses_the_grant() -> None:
 
 async def test_a_loaded_skill_lets_the_loop_run_its_tools(tmp_path: Path) -> None:
     """End to end: the grant reaches the gate through the event stream."""
-    skills = tmp_path / ".lab-harness" / "skills" / "commit"
+    skills = tmp_path / ".pyharnx" / "skills" / "commit"
     skills.mkdir(parents=True)
     (skills / "SKILL.md").write_text(
         "---\nname: commit\ndescription: Write one\nallowed-tools: Bash\n---\nDo it.\n",

@@ -3,9 +3,9 @@
 The event stream is the contract between the runtime and anything watching it.
 `Agent.subscribe(listener)` is the only way to observe a run.
 
-The provider stream protocol lives in `lab_harness/llm/events.py`, agent-level
-events in `lab_harness/agent/types.py`, and subscriber fan-out in
-`lab_harness/agent/agent.py`. The JSONL sink in `lab_harness/cli/json_sink.py` is the
+The provider stream protocol lives in `pyharnx/llm/events.py`, agent-level
+events in `pyharnx/agent/types.py`, and subscriber fan-out in
+`pyharnx/agent/agent.py`. The JSONL sink in `pyharnx/cli/json_sink.py` is the
 second consumer, which is what keeps the plain-data rule honest.
 
 ## The rule that makes this work
@@ -176,7 +176,7 @@ run could otherwise run past the user's intent.
 ## Subscribers
 
 ```python
-from lab_harness.cli.json_sink import json_sink
+from pyharnx.cli.json_sink import json_sink
 
 agent.subscribe(json_sink())  # JSONL to stdout
 agent.subscribe(json_sink(some_file))  # or any text stream
@@ -194,4 +194,5 @@ It flushes per line so a piped consumer sees events as they happen rather than
 when the process exits.
 
 Listener exceptions are isolated — a failing subscriber must not break a run.
-`tests/test_json_sink.py` proves it with a sink whose every write raises.
+`tests/test_agent_loop.py` and `tests/test_agent.py` prove it with a subscriber
+that raises.

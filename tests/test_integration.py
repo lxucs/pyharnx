@@ -1,9 +1,9 @@
 """End-to-end through the public API: a scripted model drives a real tool."""
 
-from lab_harness.agent import Agent, ToolContext, ToolResult
-from lab_harness.agent.types import AgentEvent, ExecutionMode
-from lab_harness.llm.fake import FAKE_MODEL, FakeProvider, text_response, tool_call_response
-from lab_harness.llm.types import TextBlock, ToolCallBlock, text
+from pyharnx.agent import Agent, ToolContext, ToolResult
+from pyharnx.agent.types import AgentEvent, ExecutionMode
+from pyharnx.llm.fake import FAKE_MODEL, FakeProvider, text_response, tool_call_response
+from pyharnx.llm.types import TextBlock, ToolCallBlock, text
 
 
 class CounterTool:

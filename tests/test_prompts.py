@@ -1,6 +1,6 @@
 """The prompts: shipped as data, overridden by config, assembled into the system prompt.
 
-The text itself lives in lab_harness/prompts/prompts.toml. What is pinned here is the
+The text itself lives in pyharnx/prompts/prompts.toml. What is pinned here is the
 contract around it: it loads as strictly as config, a config layer replaces it
 key by key, it names no tools, the sections go out in a fixed order with the
 variables filled in, and a section naming one that does not exist fails at
@@ -15,9 +15,9 @@ from pathlib import Path
 
 import pytest
 
-import lab_harness.config as config_module
-import lab_harness.prompts.environment as environment_module
-from lab_harness.config import (
+import pyharnx.config as config_module
+import pyharnx.prompts.environment as environment_module
+from pyharnx.config import (
     CONFIG_FILE,
     PROJECT_DIRECTORY,
     Config,
@@ -26,16 +26,16 @@ from lab_harness.config import (
     _shipped_prompts,
     load_config,
 )
-from lab_harness.llm.types import TextBlock
-from lab_harness.prompts import (
+from pyharnx.llm.types import TextBlock
+from pyharnx.prompts import (
     Environment,
     ProjectContext,
     build_system_prompt,
     detect_environment,
 )
-from lab_harness.tools import BUILTIN_TOOLS
-from lab_harness.tools.base import ToolContext
-from lab_harness.tools.shell import bash
+from pyharnx.tools import BUILTIN_TOOLS
+from pyharnx.tools.base import ToolContext
+from pyharnx.tools.shell import bash
 
 INSTRUCTIONS = ProjectContext(path=Path("/repo/AGENTS.md"), text="Use tabs.")
 ENVIRONMENT = Environment(

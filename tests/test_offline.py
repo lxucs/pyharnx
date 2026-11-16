@@ -5,7 +5,7 @@ import socket
 
 import pytest
 
-from lab_harness.config import Config, load_config
+from pyharnx.config import Config, load_config
 from tests.conftest import NetworkBlockedError
 
 

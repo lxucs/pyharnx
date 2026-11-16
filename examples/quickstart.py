@@ -3,7 +3,7 @@
     uv run python examples/quickstart.py
     uv run python examples/quickstart.py "Where does the agent loop stop?"
 
-The model comes from config — `$LAB_HARNESS_MODEL`, else `agent.model` — so the
+The model comes from config — `$PYHARNX_MODEL`, else `agent.model` — so the
 same script runs against any configured vendor, given that vendor's API key
 (`OPENAI_API_KEY` for the default). So does the system prompt: the one the
 CLI sends, built from `[prompts]` in config and from the machine it runs on,
@@ -15,12 +15,12 @@ The tools are read-only: nothing on disk changes.
 import asyncio
 import sys
 
-from lab_harness.agent import Agent, AgentEvent
-from lab_harness.config import load_config
-from lab_harness.llm.providers import route
-from lab_harness.llm.types import AssistantMessage
-from lab_harness.prompts import build_system_prompt, detect_environment, load_project_context
-from lab_harness.tools import default_registry
+from pyharnx.agent import Agent, AgentEvent
+from pyharnx.config import load_config
+from pyharnx.llm.providers import route
+from pyharnx.llm.types import AssistantMessage
+from pyharnx.prompts import build_system_prompt, detect_environment, load_project_context
+from pyharnx.tools import default_registry
 
 PROMPT = "What does this project do? Answer in three sentences."
 READ_ONLY_TOOLS = ["read", "ls", "grep", "glob"]

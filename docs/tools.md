@@ -21,7 +21,7 @@ A `ToolResult` carries two things. `content` is what the model reads.
 paths in it relative to `cwd`, like output: it reaches `--json` logs too. See
 [events.md](events.md#tool_execution_end-carries-the-results-details).
 
-The contract lives in `lab_harness/tools/base.py` rather than in `agent/`, because
+The contract lives in `pyharnx/tools/base.py` rather than in `agent/`, because
 dependencies point downward: `agent/` consumes tools, so `tools/` must never
 import from it. `agent/types.py` re-exports the names for callers.
 
@@ -33,7 +33,7 @@ so the schema and the implementation cannot drift apart.
 
 ```python
 from pydantic import BaseModel, Field
-from lab_harness.tools.base import ToolContext, ToolResult, fail, ok, tool
+from pyharnx.tools.base import ToolContext, ToolResult, fail, ok, tool
 
 
 class ReadParams(BaseModel):
@@ -77,15 +77,15 @@ the process working directory, which is what makes them testable against
 
 ### Execution mode
 
-Tools run in parallel by default. Declare `execution_mode="sequential"` to opt
-out — `write` and `edit` do, since concurrent mutation of the same file is not
+Tools run in parallel by default (`agent.parallel_tools`). Declare
+`execution_mode="sequential"` to opt out — `write` and `edit` do, since concurrent mutation of the same file is not
 something to leave to chance. One sequential tool in a batch serializes that
 whole batch.
 
 ## The registry
 
 ```python
-from lab_harness.tools import ToolRegistry, default_registry
+from pyharnx.tools import ToolRegistry, default_registry
 
 registry = default_registry()  # every built-in
 tools = registry.select(["read", "ls"])  # narrow, in order
@@ -147,7 +147,10 @@ fast enough at this scale, behaves identically on every platform, and — the
 deciding reason — runs under the offline suite with no binary installed.
 
 Both skip `tools.search.ignored_directories`, pruned *during* the walk rather
-than filtered after, so a large `node_modules` is never descended into.
+than filtered after, so a large `node_modules` is never descended into. `glob`
+matches pathlib's pattern language segment by segment on that same walk, and a
+pattern without `**` stops it at the pattern's depth — `*.py` lists one
+directory.
 
 `glob` sorts **newest first**: in a repo someone is actively working in, recency
 is a better relevance signal than alphabetical order.
@@ -165,9 +168,9 @@ is why one-shot and interactive modes differ without the loop branching.
 
 | Mode | Gate |
 |---|---|
-| `lab-harness -p "…"` | **None.** Nobody is at the keyboard to answer — narrow `--tools` instead. |
-| `lab-harness` (interactive) | Prompts for `tools.approval.required` |
-| `lab-harness --yes` | Disabled explicitly |
+| `pyharnx -p "…"` | **None.** Nobody is at the keyboard to answer — narrow `--tools` instead. |
+| `pyharnx` (interactive) | Prompts for `tools.approval.required` |
+| `pyharnx --yes` | Disabled explicitly |
 
 **It fails closed.** Only `y`/`yes`, `a`/`always` proceed. A bare Enter, an
 unrecognized answer, Ctrl-C, and Ctrl-D all deny — pressing Enter is a reflex,
@@ -206,18 +209,24 @@ Every threshold is a config key, never a literal:
 | `tools.bash.timeout_seconds` | 120 | Default command timeout |
 | `tools.bash.max_timeout_seconds` | 600 | Ceiling on a requested timeout |
 | `tools.bash.max_output_bytes` | 30000 | Output kept before eliding the middle |
+| `tools.bash.update_interval_seconds` | 0.5 | How often streaming output is forwarded |
+| `tools.bash.kill_grace_seconds` | 2.0 | Between SIGTERM and SIGKILL for a stopped command |
 | `tools.search.max_results` | 200 | Matches per `grep` page |
 | `tools.search.max_files` | 500 | Paths per `glob` page |
+| `tools.search.max_line_length` | 400 | Where a long matching line is clipped in `grep` output |
+| `tools.search.binary_sniff_bytes` | 8000 | Bytes `grep` checks for a NUL before calling a file binary |
 | `tools.search.ignored_directories` | `.git`, `node_modules`, … | Never descended into |
 | `tools.web.backend` | `tavily` | Which search backend runs |
 | `tools.web.max_results` | 5 | Results per search |
+| `tools.web.max_requested_results` | 20 | Ceiling on a requested result count |
 | `tools.web.timeout_seconds` | 30.0 | Wall-clock limit per search or fetch |
 | `tools.web.max_bytes` | 2000000 | Largest response `web_fetch` downloads |
 | `tools.web.max_content_chars` | 50000 | Extracted text handed to the model |
-| `tools.web.user_agent` | `lab-harness/0.1 …` | Sent on every outbound request |
+| `tools.web.min_content_chars` | 500 | Floor on a requested `max_chars` |
+| `tools.web.user_agent` | `pyharnx/0.1 …` | Sent on every outbound request |
 | `skills.enabled` | `true` | Whether skills are looked for at all |
 | `skills.selected` | (empty) | Which of those found apply; empty is every one |
-| `skills.directory_name` | `skills` | Subdirectory holding them, in `.lab-harness` and in home |
+| `skills.directory_name` | `skills` | Subdirectory holding them, in `.pyharnx` and in home |
 | `skills.max_bytes` | 32000 | Where a long `SKILL.md` is cut |
 
 `read`'s truncation note names the offset to resume from, as `ls`'s, `grep`'s
@@ -227,10 +236,11 @@ one costs only the range.
 
 ### Paths in output
 
-Tool output renders paths **relative to `cwd`** when they are inside it, and
-so do the paths in `details` and in a diff's header. Absolute paths leak the
-machine's layout into a transcript that may well be committed, and into every
-`--json` log — see the hygiene rules in [contributing.md](contributing.md).
+Tool output renders paths **relative to `cwd`** when they are inside it —
+`grep` and `glob` relative to the directory searched — and so do the paths in
+`details` and in a diff's header. Absolute paths leak the machine's layout into
+a transcript that may well be committed, and into every `--json` log — see the
+hygiene rules in [contributing.md](contributing.md).
 
 ### Diffs
 
@@ -248,8 +258,8 @@ A skill is instructions for one kind of task, kept in a directory rather than
 in the prompt:
 
 ```
-.lab-harness/skills/commit/SKILL.md      this project
-~/.lab-harness/skills/commit/SKILL.md    every project
+.pyharnx/skills/commit/SKILL.md      this project
+~/.pyharnx/skills/commit/SKILL.md    every project
 ```
 
 ```markdown
@@ -351,9 +361,9 @@ the message.
 
 ### Fetching
 
-`web_fetch` follows redirects, caps the download at `max_bytes`, and converts
-HTML to markdown-ish text with a stdlib parser (`tools/html_text.py` — no
-converter dependency, for the same reason `grep` and `glob` are hand-rolled).
+`web_fetch` follows redirects, stops reading the body at `max_bytes`, and
+converts HTML to markdown-ish text with a stdlib parser (`tools/html_text.py` —
+no converter dependency, for the same reason `grep` and `glob` are hand-rolled).
 Non-HTML content types pass through unparsed, so fetching a JSON API returns
 JSON rather than JSON run through an HTML parser.
 

@@ -14,7 +14,7 @@ from typing import get_args, get_origin, get_type_hints
 
 import pytest
 
-from lab_harness.config import (
+from pyharnx.config import (
     CONFIG_FILE,
     LOCAL_CONFIG_FILE,
     PROJECT_DIRECTORY,
@@ -24,10 +24,10 @@ from lab_harness.config import (
     ConfigError,
     config_paths,
     from_snapshot,
-    lab_harness_home,
     load_config,
     model_defaults,
     profile_defaults,
+    pyharnx_home,
     snapshot,
 )
 
@@ -87,7 +87,7 @@ def test_an_integer_is_accepted_for_a_float(tmp_path: Path) -> None:
 
 
 def test_the_project_file_overrides_the_home_file(tmp_path: Path) -> None:
-    write(lab_harness_home() / CONFIG_FILE, "[agent]\nmax_turns = 1\n")
+    write(pyharnx_home() / CONFIG_FILE, "[agent]\nmax_turns = 1\n")
     project(tmp_path, "[agent]\nmax_turns = 2\n")
     assert load_config(tmp_path).agent.max_turns == 2
 
@@ -101,7 +101,7 @@ def test_the_local_file_overrides_the_project_file(tmp_path: Path) -> None:
 
 def test_layers_merge_rather_than_replace(tmp_path: Path) -> None:
     """A later file overrides the keys it names and leaves the rest alone."""
-    write(lab_harness_home() / CONFIG_FILE, "[agent]\nmax_turns = 1\nparallel_tools = false\n")
+    write(pyharnx_home() / CONFIG_FILE, "[agent]\nmax_turns = 1\nparallel_tools = false\n")
     project(tmp_path, "[agent]\nmax_turns = 2\n")
     config = load_config(tmp_path)
     assert config.agent.max_turns == 2
@@ -109,7 +109,7 @@ def test_layers_merge_rather_than_replace(tmp_path: Path) -> None:
 
 
 def test_config_paths_are_in_precedence_order(tmp_path: Path) -> None:
-    home, project_directory = lab_harness_home(), tmp_path / PROJECT_DIRECTORY
+    home, project_directory = pyharnx_home(), tmp_path / PROJECT_DIRECTORY
     assert config_paths(tmp_path) == (
         home / CONFIG_FILE,
         home / LOCAL_CONFIG_FILE,
@@ -120,22 +120,22 @@ def test_config_paths_are_in_precedence_order(tmp_path: Path) -> None:
 
 def test_a_home_local_file_applies_in_any_directory(tmp_path: Path) -> None:
     """Where a key goes so it works wherever the harness runs."""
-    write(lab_harness_home() / LOCAL_CONFIG_FILE, '[tools.web.tavily]\napi_key = "k"\n')
+    write(pyharnx_home() / LOCAL_CONFIG_FILE, '[tools.web.tavily]\napi_key = "k"\n')
     for directory in (tmp_path / "one", tmp_path / "two"):
         directory.mkdir()
         assert load_config(directory).tools.web.tavily.api_key == "k"
 
 
 def test_the_home_local_file_overrides_the_home_file(tmp_path: Path) -> None:
-    write(lab_harness_home() / CONFIG_FILE, "[agent]\nmax_turns = 1\n")
-    write(lab_harness_home() / LOCAL_CONFIG_FILE, "[agent]\nmax_turns = 2\n")
+    write(pyharnx_home() / CONFIG_FILE, "[agent]\nmax_turns = 1\n")
+    write(pyharnx_home() / LOCAL_CONFIG_FILE, "[agent]\nmax_turns = 2\n")
     assert load_config(tmp_path).agent.max_turns == 2
 
 
 def test_a_file_named_explicitly_overrides_every_discovered_file(tmp_path: Path) -> None:
     """`config_file` is last: a caller with a config location of its own keeps
     the rest of the chain and wins on the keys it sets."""
-    write(lab_harness_home() / CONFIG_FILE, "[agent]\nmax_turns = 1\n")
+    write(pyharnx_home() / CONFIG_FILE, "[agent]\nmax_turns = 1\n")
     project(tmp_path, "[agent]\nmax_turns = 2\n")
     project(tmp_path, "[agent]\nmax_turns = 3\n", name=LOCAL_CONFIG_FILE)
     extra = write(tmp_path / "elsewhere.toml", "[agent]\nmax_turns = 4\n")
@@ -151,7 +151,7 @@ def test_an_explicit_file_that_is_missing_is_skipped(tmp_path: Path) -> None:
 
 def test_a_project_file_overrides_the_home_local_file(tmp_path: Path) -> None:
     """The project is the more specific place, whichever of its files says so."""
-    write(lab_harness_home() / LOCAL_CONFIG_FILE, "[agent]\nmax_turns = 1\n")
+    write(pyharnx_home() / LOCAL_CONFIG_FILE, "[agent]\nmax_turns = 1\n")
     project(tmp_path, "[agent]\nmax_turns = 2\n")
     assert load_config(tmp_path).agent.max_turns == 2
 
@@ -238,14 +238,14 @@ def test_the_error_names_the_file_it_came_from(tmp_path: Path) -> None:
 # --- home resolution ------------------------------------------------------
 
 
-def test_lab_harness_home_follows_the_env_override(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("LAB_HARNESS_HOME", "/tmp/elsewhere")
-    assert lab_harness_home() == Path("/tmp/elsewhere")
+def test_pyharnx_home_follows_the_env_override(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("PYHARNX_HOME", "/tmp/elsewhere")
+    assert pyharnx_home() == Path("/tmp/elsewhere")
 
 
-def test_lab_harness_home_expands_a_tilde(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("LAB_HARNESS_HOME", raising=False)
-    assert "~" not in str(lab_harness_home())
+def test_pyharnx_home_expands_a_tilde(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("PYHARNX_HOME", raising=False)
+    assert "~" not in str(pyharnx_home())
 
 
 # --- named provider profiles ----------------------------------------------
