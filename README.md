@@ -1,35 +1,30 @@
 # pyharnx
 
+**English** · [简体中文](https://github.com/lxucs/pyharnx/blob/main/README.zh-CN.md)
+
 [![CI](https://github.com/lxucs/pyharnx/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/lxucs/pyharnx/actions/workflows/ci.yml)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue)](https://github.com/lxucs/pyharnx/blob/main/pyproject.toml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](https://github.com/lxucs/pyharnx/blob/main/LICENSE)
 [![PyPI](https://img.shields.io/pypi/v/pyharnx)](https://pypi.org/project/pyharnx/)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.24283575.svg)](https://doi.org/10.5281/zenodo.24283575)
 
-pyharnx is **a minimal agent harness built for experiments, a lightweight 
+pyharnx is **a minimal harness built for agent experiments, a lightweight
 Python alternative to [pi](https://github.com/earendil-works/pi)**, short for
-**Py**thon **harn**ess for e**x**periments. 
+**Py**thon **harn**ess for e**x**periments.
 
 It has a **clean agentic loop**, friendly for research experiments in python, with
 built-in support to record and visualize trajectories for training or debugging.
 The code is small enough to read in an afternoon, and complete enough to run end to end.
 
-pyharnx keeps pi's layering — `llm/` for pi-ai, `agent/` for pi-agent-core, a pure
-loop wrapped by a stateful `Agent` — in Python, so the harness runs locally in
-the same process as the rest of an experiment: the data, the evaluation, the
-analysis. Where it departs from pi, and why:
-[architecture.md](https://github.com/lxucs/pyharnx/blob/main/docs/architecture.md#relationship-to-pi).
+The model reads and writes files, runs commands and searches the web, with
+whichever of those tools you give it. There are two ways in:
 
-At its core is a local agentic loop: the model reads and writes files, runs
-commands and searches the web, with whichever of those tools you give it. On
-top of it:
-
-- **An interactive terminal**, to work with the agent directly — thinking and
+- **An interactive terminal**, just like Claude Code CLI — thinking and
   tool calls as they stream, a token, cache and cost readout, and sessions that
   resume and export as a web page.
-- **A Python API**, to build on it — `from pyharnx.agent import Agent` is
+- **A Python API**, ready in Python directly — `from pyharnx.agent import Agent` is
   the whole integration. [`search_agent/`](https://github.com/lxucs/pyharnx/tree/main/search_agent) is a complete search
-  agent built that way.
+  agent example built that way.
 
 <sub>Note: pyharnx was previously named lab-harness; the demo and report below
 show the old name.</sub>
@@ -42,35 +37,65 @@ The [trajectory report](https://lxucs.github.io/pyharnx/search_agent/runs/793/re
 
 <a href="https://lxucs.github.io/pyharnx/search_agent/runs/793/report.html"><img src="https://github.com/lxucs/pyharnx/raw/main/img/report.png" width="600" alt="The trajectory report of a search agent run: turns, requests, tool calls, tokens, cache and cost, then every step"></a>
 
-## Features
+## Why pyharnx
 
-An agent experiment needs what a product harness rarely gives: the exact request
-behind every response, and the freedom to swap one piece — a tool, a hook, a
-provider — without forking the rest. pyharnx keeps the core small enough to
-hold in your head, with the seams where those changes go.
+An agent experiment asks different things of a harness than a product does. A
+product harness is built to get work done out of the box; an experiment needs
+to know exactly what happened, and to change one thing at a time. Four problems
+keep getting in the way:
+
+1. **You can't tell what the model actually saw.** A response means little
+   without the request behind it: the system prompt, the tool declarations,
+   the model, the reasoning effort, the config. Those change mid-session, and a
+   hook may rewrite a single request.
+2. **Changing one piece means forking the rest.** An experiment varies one
+   tool, one hook, one provider, one prompt. When the loop is tangled up with
+   the features around it, each change means reading and patching code you do
+   not care about — and never being sure what else moved.
+3. **Trajectories are an afterthought.** Debugging a run, or training on it,
+   needs the whole trace and the exact bodies the endpoint received — not logs
+   to reconstruct them from.
+
+pyharnx's answer: keep the core small, put the seams where changes go, and
+record every request. What it gives up for that — MCP, sub-agents, plan mode
+and the like — is listed under
+[Roadmap](https://github.com/lxucs/pyharnx#roadmap).
+
+## Features
 
 - **Minimal.** The stateless agent loop is about 500 lines of code, in
   [`agent/loop.py`](https://github.com/lxucs/pyharnx/blob/main/pyharnx/agent/loop.py); the stateful `Agent` that wraps
   it — transcript, subscribers, abort — about 150, in
-  [`agent/agent.py`](https://github.com/lxucs/pyharnx/blob/main/pyharnx/agent/agent.py). No other framework dependencies.
-- **An agent in a few lines.** `route` a provider, pick tools, build an
-  `Agent`, `await agent.prompt(...)`. The run records itself as it goes, so the
-  transcript, the [HTML report](https://lxucs.github.io/pyharnx/search_agent/runs/793/report.html) and the token
-  and cost numbers come with it.
+  [`agent/agent.py`](https://github.com/lxucs/pyharnx/blob/main/pyharnx/agent/agent.py). No other framework dependencies, so
+  what you read is all that runs.
 - **Every request reproducible.** A session records the system prompt, tools,
-  model, reasoning effort and config each request was sent with.
+  model, reasoning effort and config each request was sent with — changes
+  mid-session and a hook's rewrites included.
   [`trajectories.py --wire`](https://github.com/lxucs/pyharnx/blob/main/examples/trajectories.py) exports them as the JSON
   bodies the endpoint got. See [trajectories](https://github.com/lxucs/pyharnx/blob/main/docs/sessions.md#trajectories).
+- **Trajectories you can read.** Every run is an append-only JSONL transcript
+  with its token, cache and cost numbers. `/export` turns it into one HTML
+  page — the [report](https://lxucs.github.io/pyharnx/search_agent/runs/793/report.html) above — and the
+  session resumes where it left off.
+- **Change a piece, not the loop.** Almost everything extensible goes through
+  two seams: the [event stream](https://github.com/lxucs/pyharnx/blob/main/docs/events.md) and four
+  [hooks](https://github.com/lxucs/pyharnx/blob/main/examples/hooks.py). Tools come from a registry, the system prompt is
+  configurable TOML sections, and a [custom tool](https://github.com/lxucs/pyharnx/blob/main/examples/custom_tool.py) is one
+  file.
 - **One loop, many models.** Claude, OpenAI, DeepSeek, GLM, or any other
   OpenAI-compatible endpoint. Every endpoint and model is a table in
   [`llm/catalog.toml`](https://github.com/lxucs/pyharnx/blob/main/pyharnx/llm/catalog.toml), so a new vendor or model
-  is a few lines of TOML, not code.
+  is a few lines of TOML, not code, and switching between them is `--model`.
 
 ## Architecture
 
-Three layers. Dependencies point strictly downward: each box imports only from
-the boxes below it, and `llm/` from no other layer. (Every layer reads the leaf
-modules `config.py` and `logs.py`, which import only each other.)
+pyharnx keeps pi's layering — `llm/` for pi-ai, `agent/` for pi-agent-core, a
+pure loop wrapped by a stateful `Agent` — in Python. Where it departs from pi,
+and why: [architecture.md](https://github.com/lxucs/pyharnx/blob/main/docs/architecture.md#relationship-to-pi).
+
+Dependencies point strictly downward: each box imports only from the boxes
+below it, and `llm/` from no other layer. (Every layer reads the leaf modules
+`config.py` and `logs.py`, which import only each other.)
 
 ```
          cli/                 terminal, json sink   (subscribers)
@@ -230,8 +255,9 @@ should also read [AGENTS.md](https://github.com/lxucs/pyharnx/blob/main/AGENTS.m
   markers yet, so Anthropic's cache hit rate reads 0%.
 
 Not planned: MCP, sub-agents, plan mode, an RPC control channel,
-extensions-as-plugins, sandboxing, provider-native `web_search`. What each item
-needs, and why those are left out: [docs/README.md](https://github.com/lxucs/pyharnx/blob/main/docs/README.md#todo).
+extensions-as-plugins, sandboxing, provider-native `web_search`. Each is a
+trade for a core that stays small and readable; what each item needs, and why
+it is left out: [docs/README.md](https://github.com/lxucs/pyharnx/blob/main/docs/README.md#todo).
 
 ## Citation
 
