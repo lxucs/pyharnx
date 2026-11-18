@@ -30,6 +30,15 @@ jobs:
       # nobody tagged, and PyPI never takes a version back.
       - name: Tag matches the version
         run: test "${GITHUB_REF_NAME#v}" = "$(uv version --short)"
+      # Zenodo archives the GitHub release with the metadata in CITATION.cff,
+      # and a DOI record is not edited after the fact. The date to match is the
+      # tagged commit's in the committer's timezone, so the one they would type.
+      - name: CITATION.cff names the version
+        run: |
+          test "${GITHUB_REF_NAME#v}" = "$(sed -n 's/^version: //p' CITATION.cff)"
+      - name: CITATION.cff dates the release
+        run: |
+          test "$(git log -1 --format=%cs)" = "$(sed -n 's/^date-released: //p' CITATION.cff)"
       - run: uv build
       - uses: actions/upload-artifact@v7
         with:

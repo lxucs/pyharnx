@@ -245,15 +245,19 @@ Run them and read the output before claiming work is done.
 ## Releasing
 
 A release is a version tag; `.github/workflows/release.yml` does the rest. It
-runs the checks above, refuses a tag that disagrees with `pyproject.toml`,
-builds, and publishes to PyPI through Trusted Publishing — no token is stored
-anywhere.
+runs the checks above, refuses a tag that disagrees with `pyproject.toml` or
+`CITATION.cff`, builds, and publishes to PyPI through Trusted Publishing — no
+token is stored anywhere.
 
 ```bash
 uv version --bump patch            # or minor; edits pyproject.toml and uv.lock
-# set `version` and `date-released` in CITATION.cff to match, then commit
+# in CITATION.cff, set `version` to match and `date-released` to today, then commit
 git tag v$(uv version --short) && git push origin v$(uv version --short)
 ```
+
+Tag the commit that sets them: `date-released` is checked against the day the
+tagged commit was made. A tag the checks refuse has published nothing, so fix
+the commit, then move the tag with `git tag -f` and `git push -f origin <tag>`.
 
 Then publish a GitHub release from the tag. Zenodo archives it and gives the
 release a DOI of its own; the concept DOI in `CITATION.cff` stays, and now
