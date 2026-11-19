@@ -481,7 +481,8 @@ async def test_system_prompt_goes_to_the_top_level_field() -> None:
 
     await _collect(provider, _ctx(system_prompt="be helpful"))
 
-    assert client.messages.requests[0]["system"] == "be helpful"
+    (block,) = client.messages.requests[0]["system"]
+    assert block["text"] == "be helpful"
 
 
 async def test_tool_declarations_become_input_schema() -> None:
@@ -678,6 +679,114 @@ async def test_a_model_without_reasoning_gets_no_thinking_request() -> None:
     assert "thinking" not in client.messages.requests[0]
 
 
+# --- prompt caching -------------------------------------------------------
+
+#: The breakpoint the shipped `cache_ttl` asks for.
+MARK = {"type": "ephemeral", "ttl": SHIPPED.cache_ttl}
+LS = ToolDeclaration(name="ls", description="List.", parameters={"type": "object"})
+READ = ToolDeclaration(name="read", description="Read.", parameters={"type": "object"})
+
+
+async def _sent(ctx: Context, **config: Any) -> dict[str, Any]:
+    client = _FakeClient([_msg_start(), _msg_delta("end_turn")])
+    provider = AnthropicProvider(replace(SHIPPED, **config), client=client)  # type: ignore[arg-type]
+    await _collect(provider, ctx)
+    return client.messages.requests[0]
+
+
+def _calls(*ids: str) -> AssistantMessage:
+    return AssistantMessage(
+        content=tuple(ToolCallBlock(id=i, name="ls", arguments={}) for i in ids),
+        model=MODEL.id,
+        provider="anthropic",
+        stop_reason="tool_use",
+    )
+
+
+def _result(call_id: str) -> ToolResultMessage:
+    return ToolResultMessage(tool_call_id=call_id, tool_name="ls", content=text(call_id))
+
+
+def _marked(messages: list[dict[str, Any]]) -> list[tuple[int, int]]:
+    """(message, block) for every block in `messages` carrying a marker."""
+    return [
+        (i, j)
+        for i, message in enumerate(messages)
+        for j, block in enumerate(message["content"])
+        if "cache_control" in block
+    ]
+
+
+async def test_the_system_prompt_closes_the_cached_prefix() -> None:
+    """Tools render ahead of the system prompt, so one marker there caches both."""
+    request = await _sent(_ctx(system_prompt="be helpful", tools=(LS, READ)))
+
+    assert request["system"] == [{"type": "text", "text": "be helpful", "cache_control": MARK}]
+    assert all("cache_control" not in tool for tool in request["tools"])
+
+
+async def test_without_a_system_prompt_the_last_tool_closes_it() -> None:
+    request = await _sent(_ctx(system_prompt="", tools=(LS, READ)))
+
+    assert "system" not in request
+    assert [tool.get("cache_control") for tool in request["tools"]] == [None, MARK]
+
+
+async def test_the_last_block_of_the_last_two_user_turns_is_marked() -> None:
+    """The newer is where this request writes, the older where the previous one
+    did — so the read does not depend on the API's lookback finding it."""
+    messages = (
+        UserMessage(content=text("go")),
+        _calls("t1"),
+        _result("t1"),
+        _calls("t2", "t3"),
+        _result("t2"),
+        _result("t3"),
+    )
+
+    request = await _sent(_ctx(messages=messages))
+
+    wire = request["messages"]
+    assert [m["role"] for m in wire] == ["user", "assistant", "user", "assistant", "user"]
+    assert _marked(wire) == [(2, 0), (4, 1)], "merged results: the turn's last block"
+    assert wire[4]["content"][1]["cache_control"] == MARK
+
+
+async def test_a_long_conversation_stays_within_the_four_markers_allowed() -> None:
+    turns = [m for i in range(10) for m in (_calls(f"t{i}"), _result(f"t{i}"))]
+
+    request = await _sent(_ctx(messages=(UserMessage(content=text("go")), *turns), tools=(LS,)))
+
+    assert len(_marked(request["messages"])) == 2
+    assert request["system"][0]["cache_control"] == MARK
+
+
+async def test_a_one_message_request_marks_that_message() -> None:
+    request = await _sent(_ctx())
+
+    assert _marked(request["messages"]) == [(0, 0)]
+
+
+async def test_the_configured_ttl_is_the_one_sent() -> None:
+    request = await _sent(_ctx(), cache_ttl="1h")
+
+    assert request["system"][0]["cache_control"] == {"type": "ephemeral", "ttl": "1h"}
+    assert request["messages"][0]["content"][0]["cache_control"] == {
+        "type": "ephemeral",
+        "ttl": "1h",
+    }
+
+
+async def test_an_empty_ttl_sends_no_markers() -> None:
+    """Anthropic caches only what a request marks, so this is the switch."""
+    messages = (UserMessage(content=text("go")), _calls("t1"), _result("t1"))
+
+    request = await _sent(_ctx(messages=messages, tools=(LS,)), cache_ttl="")
+
+    assert request["system"] == "sys"
+    assert "cache_control" not in json.dumps(request)
+
+
 # --- what was sent, rebuilt -------------------------------------------------
 
 
@@ -721,6 +830,7 @@ async def test_request_body_is_the_json_the_sdk_posts() -> None:
 
     assert isinstance(streamed[-1], StreamDone)
     assert provider.request_body(MODEL, ctx) == posted[0]
+    assert posted[0]["system"][0]["cache_control"] == MARK, "the SDK passed the marker on"
 
 
 def test_reply_entries_are_what_the_next_request_carries() -> None:
@@ -763,7 +873,7 @@ async def test_the_log_names_the_response_and_its_stop_reason_as_sent(
         await _collect(provider, _ctx())
 
     assert (
-        f"Request to {MODEL.id}: max_tokens={MODEL.max_tokens} messages=1 system=3" in caplog.text
+        f"Request to {MODEL.id}: max_tokens={MODEL.max_tokens} messages=1 system=1" in caplog.text
     )
     assert 'thinking={"type":"adaptive","display":"summarized"}' in caplog.text
     assert f"Response msg_1 from {MODEL.id}" in caplog.text

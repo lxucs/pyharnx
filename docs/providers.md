@@ -171,16 +171,20 @@ Four translation details that are not obvious:
   yields `{}`, and the loop already refuses to execute calls from a
   length-stopped turn.
 
-**TODO: prompt caching.** The adapter sends no `cache_control` markers, and
-Anthropic caches nothing without them, so every request pays full price for
-its prompt and the terminal's cache figure reads 0%. The plan: one marker on
-the system prompt, which caches the tools rendered ahead of it too, and one on
-the last block of each of the last two user messages. The second of those sits
-exactly where the previous request wrote its entry, so a turn that adds more
-than the API's 20-block lookback — many parallel tool calls — still hits.
-Three markers, under the limit of four. `Usage` already reports cache reads
-and writes, and the shipped [prices](configuration.md#prices) already include
-both rates, so nothing downstream changes when it lands.
+**Prompt caching.** Anthropic caches only what a request marks, so the
+adapter marks three places. The system prompt, which caches the tools rendered
+ahead of it too; with no system prompt, the last tool. And the last block of
+each of the last two user turns: the newer is where this request writes, the
+older exactly where the previous request did, so the read never rests on the
+API's 20-block lookback reaching back — a reply interleaving server-tool
+results with text can add more blocks than that. Three markers, under the
+limit of four.
+
+`providers.anthropic.cache_ttl` is the entries' lifetime. `"5m"` ships: every
+request in a loop restarts the clock, so a run stays warm. `"1h"` outlasts a
+slow reply in the terminal, but writes cost 2x input rather than 1.25x, and
+the shipped [prices](configuration.md#prices) are the five-minute rate — raise
+`cache_write` with it. `""` sends no markers and caches nothing.
 
 ### The thinking request
 

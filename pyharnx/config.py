@@ -310,6 +310,11 @@ class AnthropicConfig:
     #: Budget for those models, in tokens, when a reasoning effort is set —
     #: any level. They do not think otherwise.
     thinking_budget_tokens: int
+    #: Lifetime of a prompt-cache entry: "5m" or "1h". Anthropic caches only
+    #: what a request marks, so empty is the off switch: no markers, nothing
+    #: cached. An hour costs twice the input rate to write rather than 1.25
+    #: times, and the catalog's `cache_write` prices are the five-minute ones.
+    cache_ttl: str
 
 
 @dataclass(frozen=True, slots=True)

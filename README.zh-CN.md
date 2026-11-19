@@ -183,7 +183,6 @@ messages = await agent.prompt(question)
 ## 路线图
 
 - **Context compaction** —— 唯一计划中但尚未实现的部分。它可以放进 `prepare_request` hook，因此落地时无需改动 loop。
-- **Anthropic prompt caching** —— Messages adapter 目前还不发送 `cache_control` 标记，所以 Anthropic 的 cache 命中率显示为 0%。
 
 不在计划内：MCP、sub-agents、plan mode、RPC 控制通道、插件化扩展、沙箱、provider 原生 `web_search`。每一项都是为了让核心保持小而可读所做的取舍；每一项需要什么、为什么不做，见 [docs/README.md](docs/README.md#todo)。
 

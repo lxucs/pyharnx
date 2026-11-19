@@ -237,6 +237,8 @@ class AnthropicProvider:
             if effort and not self._takes_budget(model):
                 # Adaptive thinking has no budget; effort is how deep it goes.
                 request["output_config"] = {"effort": effort}
+        if self._config.cache_ttl:
+            _mark_cache_points(request, {"type": "ephemeral", "ttl": self._config.cache_ttl})
         return request
 
     def _thinking(self, model: Model, effort: str) -> dict[str, Any] | None:
@@ -298,6 +300,24 @@ def _to_wire_messages(messages: tuple[Message, ...]) -> list[dict[str, object]]:
             }
         )
     return wire
+
+
+def _mark_cache_points(request: dict[str, Any], marker: dict[str, str]) -> None:
+    """Prompt-cache breakpoints, since Anthropic caches only what is marked.
+
+    One closes the fixed prefix: the system prompt, or the last tool when there
+    is none, as tools render ahead of it. One goes on the last block of each of
+    the last two user turns — the newer is where this request writes, the older
+    where the previous request did, so the read never rests on the API's
+    20-block lookback finding it. Three, of the four a request may carry.
+    """
+    if "system" in request:
+        request["system"] = [{"type": "text", "text": request["system"], "cache_control": marker}]
+    elif "tools" in request:
+        request["tools"][-1]["cache_control"] = marker
+    turns = [message for message in request["messages"] if message["role"] == "user"]
+    for turn in turns[-2:]:
+        turn["content"][-1]["cache_control"] = marker
 
 
 def _is_tool_result_turn(entry: dict[str, object]) -> bool:

@@ -50,6 +50,12 @@ budget_thinking_models = [
 # Budget for those models, in tokens, when a reasoning effort is set — any
 # level. They do not think otherwise.
 thinking_budget_tokens = 4_096
+# Lifetime of a prompt-cache entry: "5m" or "1h". Anthropic caches only what a
+# request marks, so "" sends no markers and caches nothing. A read restarts the
+# clock, so five minutes keeps an agent loop warm; an hour outlasts a slow
+# reply, but costs 2x input to write rather than 1.25x — and the cache_write
+# prices below are the five-minute ones, so raise them alongside it.
+cache_ttl = "5m"
 
 
 # --- endpoints --------------------------------------------------------------

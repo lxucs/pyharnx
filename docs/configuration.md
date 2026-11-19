@@ -381,8 +381,10 @@ cached tokens free.
 **Shipped prices**, all in USD:
 
 - Claude, at Anthropic's first-party list rates (mid-2026; Fable 5 from
-  2026-10), with `cache_write` at the 5-minute-TTL premium. Bedrock and Vertex
-  bill differently.
+  2026-10), with `cache_write` at the 5-minute-TTL premium, the
+  `providers.anthropic.cache_ttl` that ships. At `"1h"` a write bills at 2x
+  input instead, so raise `cache_write` with it. Bedrock and Vertex bill
+  differently.
 - The GPT-6 models, at OpenAI's standard-tier rates (2026-10). A request over
   272K input tokens bills at OpenAI's long-context rates instead, which one
   rate cannot follow, so a cost shown for one runs low. `cache_write` is zero:

@@ -299,11 +299,11 @@ Set `terminal.show_usage = false` to drop the per-run line; `/status` still
 works. The line is interactive-only: in `-p` mode stdout is the answer, and
 `--json` already carries `usage` on every assistant `message_end`.
 
-**Anthropic cache hits read 0% for now.** Anthropic only caches a prompt that
-marks where to, and the adapter does not send those markers yet — see the
-[TODO in providers.md](providers.md#the-anthropic-adapter). OpenAI and
-DeepSeek cache repeated prefixes on their own and report the hits, so their
-figures are real. Another Chat Completions vendor counts only if it reports
+**Where the cache figure comes from.** Anthropic caches only a prompt that
+marks where to, and the adapter marks every request — see
+[prompt caching](providers.md#the-anthropic-adapter). OpenAI and DeepSeek
+cache repeated prefixes on their own and report the hits. Another Chat
+Completions vendor counts only if it reports
 `prompt_tokens_details.cached_tokens`, the field the adapter reads.
 
 ## JSON mode
@@ -506,10 +506,10 @@ call, with the ids that find each one in the transcript and in `--json`:
 
 ```
 DEBUG pyharnx.agent.loop: Turn 1/50: 1 message(s) to claude-sonnet-5
-DEBUG pyharnx.llm.providers.anthropic: Request to claude-sonnet-5: max_tokens=64000 messages=1 system=429 tools=9 thinking={"type":"adaptive","display":"summarized"}
+DEBUG pyharnx.llm.providers.anthropic: Request to claude-sonnet-5: max_tokens=64000 messages=1 system=1 tools=9 thinking={"type":"adaptive","display":"summarized"}
 DEBUG pyharnx.llm.providers.anthropic: Response msg_01ExampleId from claude-sonnet-5
 DEBUG pyharnx.llm.providers.anthropic: Response stop_reason=tool_use
-DEBUG pyharnx.agent.loop: Response stop=tool_use thinking=212 text=31 tool_calls=1 in=1520 cache_read=0 cache_write=0 out=96 time=2.1s first_token=0.8s
+DEBUG pyharnx.agent.loop: Response stop=tool_use thinking=212 text=31 tool_calls=1 in=3 cache_read=0 cache_write=1517 out=96 time=2.1s first_token=0.8s
 DEBUG pyharnx.agent.loop: Tool call toolu_01ExampleId: bash(command)
 DEBUG pyharnx.cli.approval: Tool call toolu_01ExampleId: approval answered 'yes'
 DEBUG pyharnx.agent.loop: Tool call toolu_01ExampleId: ok in 1515ms exit_code=0 truncated=False

@@ -40,7 +40,8 @@ does rather than what it will do. At a glance:
   bounded and, for reading and searching, paged by offset; `web_search` and
   `web_fetch` behind pluggable backends; three provider adapters — Messages,
   Responses, Chat Completions. Reasoning is carried across tool calls the way
-  each vendor requires, a retryable failure is sent again with a doubling
+  each vendor requires, Claude's requests mark their prompt for caching, a
+  retryable failure is sent again with a doubling
   backoff, and a Chat Completions endpoint that cannot be streamed is read in
   one response. [tools.md](tools.md) · [providers.md](providers.md)
 - **Terminal** — streamed, collapsible thinking; colored edit diffs; slash
@@ -65,10 +66,6 @@ does rather than what it will do. At a glance:
   the session schema reserves a `compaction` entry — so it lands without
   touching the loop. Its rewrites are recorded already; the entry is for
   writing a summary once rather than the whole view with every request.
-- **Anthropic prompt caching.** The Messages adapter sends no `cache_control`
-  markers yet, so Anthropic caches nothing and its cache hit rate reads 0%.
-  Contained to one function in `anthropic.py`; the placement is planned in
-  [providers.md](providers.md#the-anthropic-adapter).
 
 ### Not planned
 

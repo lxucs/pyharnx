@@ -31,7 +31,7 @@ _OMITTED = frozenset({"model", "stream"})
 
 
 def request_shape(request: Mapping[str, Any]) -> str:
-    """`messages=12 system=1830 tools=9 max_tokens=8192 thinking={"type":"adaptive"}`.
+    """`messages=12 system=1 tools=9 max_tokens=8192 thinking={"type":"adaptive"}`.
 
     A size is items for a list and characters for a string.
     """

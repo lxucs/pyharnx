@@ -251,8 +251,6 @@ should also read [AGENTS.md](https://github.com/lxucs/pyharnx/blob/main/AGENTS.m
 
 - **Context compaction** — the one planned piece unbuilt. It fits the
   `prepare_request` hook, so it lands without touching the loop.
-- **Anthropic prompt caching** — the Messages adapter sends no `cache_control`
-  markers yet, so Anthropic's cache hit rate reads 0%.
 
 Not planned: MCP, sub-agents, plan mode, an RPC control channel,
 extensions-as-plugins, sandboxing, provider-native `web_search`. Each is a
