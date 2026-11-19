@@ -3,8 +3,8 @@
 cff-version: 1.2.0
 message: If you use pyharnx in your research, please cite it as below.
 type: software
-version: 0.1.0
-date-released: 2026-11-16
+version: 0.2.0
+date-released: 2026-11-19
 # The concept DOI, which resolves to the latest version Zenodo has archived.
 # Each release also gets a DOI of its own, on its Zenodo record.
 doi: 10.5281/zenodo.24283575
